@@ -1,0 +1,227 @@
+var rumms	= {};
+/*// type hint
+var ConversationContext = {
+	connected:		function(conversationId)
+	disconnected:	function(conversationId)
+	upgraded:		function(version)
+	message:		function(object)
+	error:			function(object)
+};
+*/
+rumms.userData	= @{USER_DATA};
+rumms.Conversation	= function(context) {
+	this.context		= context;
+	this.conversationId = null;
+	
+	this.connected		= false;
+	this.queue			= null;
+	this.clientCont 	= null;
+	this.serverCont 	= null;
+	this.commAbortFunc	= null;
+};
+rumms.Conversation.prototype = {
+	version:		@{VERSION},
+	encoding:		@{ENCODING},
+	clientTTL:		@{CLIENT_TTL},
+	servletPrefix:	@{SERVLET_PREFIX},
+	
+	/** delay before opening a new connection when the last opening failed */
+	errorDelay:	10000,
+		
+	/** delay between queue polling */
+	pollDelay:	500,
+	
+	//------------------------------------------------------------------------------
+	
+	connect: function() {
+		this.hiLoop();
+	},
+	
+	send: function(message) {
+		this.queue.push({ id: this.clientCont, message: message });
+		this.clientCont++;
+		this.commImmediate();
+	},
+	
+	//------------------------------------------------------------------------------
+
+	hiLoop: function() {
+		var self	= this;
+		var	client	= new XMLHttpRequest();
+		client.open("POST", this.servletPrefix + "/hi?_=", true);
+		client.onreadystatechange = function() {
+			if (client.readyState !== 4)	return;
+			clearTimeout(timer);
+			try { 
+				if (client.status == 200) {
+					self.hiSuccess(client.responseText);
+				}
+				else {
+					self.notifyError("hi", "expected status 200");
+					self.hiError();
+				}
+			}
+			catch (e) { 
+				self.notifyError("hi", "cannot get client status", e);
+				self.hiError(); 
+			}
+		};
+		var timer	= setTimeout(
+			function() { client.abort(); }, 
+			this.clientTTL
+		);
+		client.send(this.version);
+	},
+	
+	hiSuccess: function(text) {
+		this.queue			= [];
+		this.clientCont 	= 0;
+		this.serverCont 	= 0;
+	
+		this.conversationId = text.scan("OK ");
+		if (this.conversationId === null) {
+			this.connected	= false;
+			var	version	= text.scan("VERSION ");
+			this.context.upgraded(version);
+			return;
+		}
+		
+		this.context.connected(this.conversationId);
+			
+		this.connected	= true;
+		this.commLoop();
+	},
+	
+	hiError: function(exception) {
+		this.connected	= false;
+
+		this.conversationId = null;
+		
+		this.queue			= null;
+		this.clientCont 	= null;
+		this.serverCont 	= null;
+	},
+	
+	//------------------------------------------------------------------------------
+	
+	commLoop: function() {
+		if (!this.connected)	return;
+		
+		var self	= this;
+		var	client	= new XMLHttpRequest();
+		client.open("POST", this.servletPrefix + "/comm?_=", true);
+		client.onreadystatechange = function() {
+			if (client.readyState !== 4)	return;
+			
+			clearTimeout(timer);
+			this.commAbortFunc	= null;
+			
+			// a forced abort occurs if someone needs to send messages immediately
+			if (forcedAbort) { self.commLoop(); return; }
+
+			try { 
+				if (client.status == 200) {
+					self.commSuccess(client.responseText);
+				}
+				else {
+					self.notifyError("comm", "expected status 200");
+					self.commError();
+				}
+			}
+			catch (e) { 
+				self.notifyError("comm", "cannot get client status", e);
+				self.commError(); 
+				return; 
+			}
+			
+		};
+		var timer	= setTimeout(
+			function() { client.abort(); },
+			this.clientTTL
+		);
+		client.send(JSON.stringify({
+			"conversation": this.conversationId,
+			// which messages have been sent to the server with this request
+			"clientCont":	this.clientCont,
+			// which messages the server told me will be next
+			"serverCont":	this.serverCont,
+			// new messages go to the server
+			"messages":		this.queue.map(function(it) { return it.message; })//,
+		}));
+		
+		// enable forced aborts when messages should be sent immediately
+		var forcedAbort	= false;
+		this.commAbortFunc	= function() { 
+			forcedAbort	= true;
+			client.abort(); 
+		};
+	},
+	
+	commImmediate: function() {
+		if (!this.commAbortFunc)	return;
+		this.commAbortFunc();
+	},
+		
+	commSuccess: function(text) {
+		// HACK for "messages has no properties" failure
+		if (text == "") {
+			this.notifyError("comm", "empty response");
+			this.commLater(this.errorDelay);
+			return;
+		}
+		
+		// the server did not recognize our conversation id
+		if (text == "CONNECT") {
+			this.connected	= false;
+			this.context.disconnected(this.conversationId);
+			return;
+		}
+		
+		try {
+			var data	= JSON.parse(text);
+			
+			// which messages to ask the server for on the next request
+			this.serverCont = data.serverCont;
+
+			// remove messages the server has already seen
+			this.queue	= this.queue.filter(function(it) { return it.id >= data.clientCont; });
+			
+			// publish new messages from the server to our context
+			var messages	= data.messages;
+			var self	= this;
+			messages.forEach(function(it) {
+				try {
+					self.context.message(it);
+				}
+				catch (e) {
+					this.notifyError("comm", "exception in message handler", e, it);
+				}
+			});
+			this.commLater(this.pollDelay);
+		}
+		catch (e) {
+			this.notifyError("comm", "exception in message parser", e, text);
+			this.commLater(this.errorDelay);
+		}
+	},
+	
+	commError: function(exception) {
+		this.commLater(this.errorDelay);
+	},
+	
+	commLater: function(delay) {
+		var self	= this;
+		setTimeout(function() { self.commLoop(); }, delay);
+	},
+	
+	//------------------------------------------------------------------------------
+	
+	notifyError: function(method, description, exception, details) {
+		this.context.error({
+			method:			method,
+			description:	description,
+			exception:		exception	|| null,
+			details:		details		|| null
+		});
+	}//,
+};
