@@ -77,11 +77,16 @@ rumms.Conversation.prototype = {
 		this.queue			= [];
 		this.clientCont 	= 0;
 		this.serverCont 	= 0;
+		
+		function scan(s,p) {
+			return s.substring(0, p.length) === p
+					? s.substring(p.length) : null;
+		}
 	
-		this.conversationId = text.scan("OK ");
+		this.conversationId = scan(text, "OK ");
 		if (this.conversationId === null) {
 			this.connected	= false;
-			var	version	= text.scan("VERSION ");
+			var	version	= scan(text, "VERSION ");
 			this.context.upgraded(version);
 			return;
 		}
