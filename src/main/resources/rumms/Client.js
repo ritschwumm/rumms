@@ -199,7 +199,7 @@ rumms.Conversation.prototype = {
 					self.context.message(it);
 				}
 				catch (e) {
-					this.notifyError("comm", "exception in message handler", e, it);
+					self.notifyError("comm", "exception in message handler", e, it);
 				}
 			});
 			this.commLater(this.pollDelay);

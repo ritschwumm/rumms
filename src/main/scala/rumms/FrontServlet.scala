@@ -19,7 +19,7 @@ import scutil.ext.StringImplicits._
 import scutil.ext.InputStreamImplicits._
 
 import scjson._
-import scjson.JSExtract._
+import scjson.JSNavigation._
 
 import rumms.util.Expiring
 
@@ -206,72 +206,72 @@ final class FrontServlet extends HttpServlet with Logging {
 		}
 	}
 	
+	private val continuationAttribute	= "CONT"
+	
 	/** receive and send messages for a single Conversation */
 	private def comm(request:HttpServletRequest, response:HttpServletResponse) {
-		val continuationAttribute	= "CONT"
-		val readerAttribute			= "READ"
-	
-		// maybe there's data from the continuation
-		val continuationData	= (request getAttribute continuationAttribute).asInstanceOf[String]
-		if (continuationData != null) {
-			response sendString (applicationJSON, continuationData)
-			return
-		}
+		val continuation	= ContinuationSupport getContinuation request
 		
-		// request reader data is not repeatable across an expired continuation
-		val dataStr	= (request getAttribute readerAttribute).asInstanceOf[String].nullOption getOrElse {
-			val	tmp	= request.getReader use { _.readFully }
-			request setAttribute (readerAttribute, tmp)
-			tmp
-		}
+		if (continuation.isInitial) {
+			// DEBUG("initial continuation, reading data from request", continuation)
+			
+			val dataStr	= request.getReader use { _.readFully }
+			
+			// parse batch message
+			val data			= JSParser parse dataStr
+			val conversationId	= (data / "conversation"	string)		getOrElse { INFO("conversationId missing");	response setStatusIllegalParams();	return }
+			val	clientCont		= (data / "clientCont"		long)		getOrElse { INFO("clientCont missing");		response setStatusIllegalParams();	return }
+			val	serverCont		= (data / "serverCont"		long)		getOrElse { INFO("serverCont missing");		response setStatusIllegalParams();	return }
+			val incoming		= (data / "messages"		arraySeq)	getOrElse { INFO("messages missing");		response setStatusIllegalParams();	return }
+			
+			val conversation	= getConversation(ConversationId(conversationId)) getOrElse { response sendString (textPlain, DISCONNECTED_TEXT); 	return }
+			
+			// give new messages to the client
+			conversation handleIncoming (incoming, clientCont)
 		
-		// parse batch message
-		val data			= JSParser parse dataStr
-		val conversationId	= (data / "conversation"	string)		getOrElse { response setStatusIllegalParams();	return }
-		val	clientCont		= (data / "clientCont"		long)		getOrElse { response setStatusIllegalParams();	return }
-		val	serverCont		= (data / "serverCont"		long)		getOrElse { response setStatusIllegalParams();	return }
-		val incoming		= (data / "messages"		arraySeq)	getOrElse { response setStatusIllegalParams();	return }
-		
-		val conversation	= getConversation(ConversationId(conversationId)) getOrElse { response sendString (textPlain, DISCONNECTED_TEXT); 	return }
-		
-		// give new messages to the client
-		conversation handleIncoming (incoming, clientCont)
-		
-		def compileResponse(batch:Batch):String =
-				JSParser unparse JSObject(Map(
-					JSString("clientCont")	-> JSNumber(clientCont),
-					JSString("serverCont")	-> JSNumber(batch.serverCont),
-					JSString("messages")	-> JSArray(batch.messages)
-				))
-					
-		// maybe there already are new messages
-		val fromConversation	= conversation fetchOutgoing serverCont
-		if (fromConversation.messages.nonEmpty) {
-			response sendString (applicationJSON, compileResponse(fromConversation))
-			return
-		}
-		
-		// nothing there atm, use a continuation to delay the response
-		val continuation	= ContinuationSupport.getContinuation(request)
-		
-		// If no timeout listeners resume or complete the continuation, 
-		// then the continuation is resumed with continuation.isExpired() true
-		if (continuation.isExpired) {
-			// NOTE the publisher for this continuation is silently overwritten in the Conversation
-			response sendString (applicationJSON, compileResponse(fromConversation))
-			return
-		}
-		
-		// fetch again later and resume the continuation
-		continuation.setTimeout(Config.continuationTTL.millis)
-		continuation.suspend()
-		conversation onHasOutgoing thunk {
-			// the continuation may have expired already
-			if (continuation.isSuspended) {
-				val fromLater	= conversation fetchOutgoing serverCont
-				continuation.setAttribute(continuationAttribute, compileResponse(fromLater))
-				continuation.resume()
+			def compileResponse(batch:Batch):String =
+					JSParser unparse JSObject(Map(
+						JSString("clientCont")	-> JSNumber(clientCont),
+						JSString("serverCont")	-> JSNumber(batch.serverCont),
+						JSString("messages")	-> JSArray(batch.messages)
+					))
+				
+			// maybe there already are new messages
+			val fromConversation	= conversation fetchOutgoing serverCont
+			if (fromConversation.messages.nonEmpty) {
+				// DEBUG("sending available data immediately", continuation)
+				val	responseString	= compileResponse(fromConversation)
+				response sendString (applicationJSON, responseString)
 			}
+			else {
+				val responseThunk:Thunk[String]	= thunk {
+					val fromLater	= conversation fetchOutgoing serverCont
+					compileResponse(fromLater)
+				}
+				// DEBUG("suspending continuation to delay response", continuation)
+				// fetch again later and resume the continuation
+				continuation.setTimeout(Config.continuationTTL.millis)
+				continuation setAttribute (continuationAttribute, responseThunk)
+				continuation.suspend()
+				conversation onHasOutgoing thunk {
+					// DEBUG("resuming continuation", continuation)
+					continuation.resume()
+				}
+			}
+		}
+		else if (continuation.isResumed || continuation.isExpired) {
+			val responseThunk:Thunk[String]	= (request getAttribute continuationAttribute).asInstanceOf[Thunk[String]]
+			if (responseThunk != null) {
+				// DEBUG("resumed continuation, using fetcher", continuation)
+				val	responseString	= responseThunk()
+				response sendString (applicationJSON, responseString)
+			}
+			else {
+				// DEBUG("resumed continuation with null responseThunk!!!", continuation)
+			}
+		}
+		else {
+			WARN("unexpected continuation state", continuation)
 		}
 	}
 	
@@ -314,7 +314,7 @@ final class FrontServlet extends HttpServlet with Logging {
 				val conversation	= conversationOpt	getOrElse { response.setStatusIllegalParams();	return }
 				val messageJS		= messageJSOpt		getOrElse { response.setStatusIllegalParams();	return }
 				val	size			= request.getContentLength
-				val contentType		= item.getContentType.nullOption map ContentType.apply getOrElse ContentType.unknown
+				val contentType		= item.getContentType.guardNotNull map ContentType.apply getOrElse ContentType.unknown
 				val fileName		= item.getName
 				
 				if (size == -1)	{
@@ -331,7 +331,7 @@ final class FrontServlet extends HttpServlet with Logging {
 				// 	return
 				// }
 				
-				DEBUG("upload stream running", fileName, contentType)
+				// DEBUG("upload stream running", fileName, contentType)
 				
 				val upload	= Upload(contentType, size, stream, fileName)
 				val accepted	= 
@@ -347,7 +347,7 @@ final class FrontServlet extends HttpServlet with Logging {
 				try { stream.close() }
 				catch { case e	=> /* may already be closed */ }
 				
-				DEBUG("upload stream done", fileName, accepted)
+				// DEBUG("upload stream done", fileName, accepted)
 			}
 		}
 		

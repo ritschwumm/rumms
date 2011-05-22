@@ -25,7 +25,7 @@ final class Conversation(val id:ConversationId, controller:Controller) extends L
 			incoming drop (count-relevant) 
 		} 
 		.foreach { it => 
-			controller.receiveMessage(id, it) 
+			controller receiveMessage (id, it) 
 		}
 	}
 	
@@ -48,12 +48,13 @@ final class Conversation(val id:ConversationId, controller:Controller) extends L
 	def appendOutgoing(message:JSValue) {
 		synchronized {
 			val entry	= Entry(nextId, message)
+			
 			nextId		= nextId + 1
 			entries		= entry :: entries
 			
-			val tmp	= publishers
+			val out	= publishers
 			publishers	= None
-			tmp
+			out
 		} 
 		.foreach { it =>
 			try { it() }
@@ -70,7 +71,7 @@ final class Conversation(val id:ConversationId, controller:Controller) extends L
 	
 	/** used by the webserver to be notified there is data to fetch */
 	def onHasOutgoing(publisher:()=>Unit):Unit = synchronized {
-		// NOTE if there already is an expired continuation, it is overwritten silently
+		// NOTE if there already is an expired continuation, it is silently overwritten
 		publishers	= Some(publisher)
 	}
 }

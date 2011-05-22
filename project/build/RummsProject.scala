@@ -1,8 +1,8 @@
 import sbt._
 
 final class RummsProject(info:ProjectInfo) extends DefaultProject(info) {
-	val scutil				= "de.djini"				%% "scutil"				% "0.0.2"			% "compile"
-	val scjson				= "de.djini"				%% "scjson"				% "0.0.2"			% "compile"
+	val scutil				= "de.djini"				%% "scutil"				% "0.0.3"			% "compile"
+	val scjson				= "de.djini"				%% "scjson"				% "0.0.3"			% "compile"
 
 	val servlet_api			= "javax.servlet"			% "servlet-api"			% "2.5"				% "provided"
 

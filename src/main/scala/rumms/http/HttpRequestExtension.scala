@@ -14,7 +14,7 @@ final class HttpRequestExtension(delegate:HttpServletRequest) {
 	}
 
 	def paramString(name:String):Option[String] =
-			delegate getParameter name nullOption
+			delegate getParameter name guardNotNull
 	
 	def paramInt(name:String):Option[Int] =
 			paramString(name) flatMap parseInt
@@ -28,7 +28,7 @@ final class HttpRequestExtension(delegate:HttpServletRequest) {
 	*/
 			
 	def headerString(name:String):Option[String] = 
-			delegate.getHeader(name).nullOption
+			delegate getHeader name guardNotNull
 			
 	def headerInt(name:String):Option[Int] = 
 			headerString(name) flatMap parseInt

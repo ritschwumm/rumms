@@ -43,17 +43,17 @@ final class DomServlet extends HttpServlet with Logging {
 		
 		// TODO use validated? or either?
 		def createAction:Action	= 
-				(request.getServletPath).nullOption match {
+				request.getServletPath.guardNotNull match {
 					case Some(path)	=>
 						(path indexOf "..") match {
 							case -1	=>
-								(getServletConfig.getServletContext getResource path).nullOption match {
+								(getServletConfig.getServletContext getResource path).guardNotNull match {
 									case Some(url)	=>
 										// TODO handle exceptions
 										val text	= new InputStreamReader(url.openStream, Config.encoding.name) use { _.readFully }
 										DomTemplate compile text match {
 											case Valid(js)	=> 
-												DEBUG("compiled DOM for path", path)
+												// DEBUG("compiled DOM for path", path)
 												jsAction(js)
 											case Invalid(err)  =>
 												ERROR("cannot compile DOM for path", path)

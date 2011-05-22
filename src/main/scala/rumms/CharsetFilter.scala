@@ -20,7 +20,7 @@ final class CharsetFilter extends Filter {
 	def doFilter(request:ServletRequest, response:ServletResponse, filterChain:FilterChain) {
 		for {
 			config	<- filterConfig
-			charset	<- config getInitParameter "charset" nullOption
+			charset	<- config getInitParameter "charset" guardNotNull
 		}
 		yield {
 			// config.getServletContext log ("filter: " + response.getContentType)
