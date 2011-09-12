@@ -10,6 +10,11 @@ case class Batch(serverCont:Long, messages:List[JSValue])
 
 final class Conversation(val id:ConversationId, controller:Controller) extends Logging {
 	//------------------------------------------------------------------------------
+	//## state
+	
+	@volatile private[rumms] var remoteUser	= None:Option[String]
+	
+	//------------------------------------------------------------------------------
 	//## client -> server
 	
 	private var lastClientCont	= 0L
@@ -29,9 +34,8 @@ final class Conversation(val id:ConversationId, controller:Controller) extends L
 		}
 	}
 	
-	def handleUpload(message:JSValue, upload:Upload):Boolean	= controller handleUpload	(id, message, upload)
-	def handleDownload(message:JSValue):Option[Download]		= controller handleDownload	(id, message)
-	
+	def downloadContent(message:JSValue):Option[Content]							= controller downloadContent	(id, message)
+	def uploadContent(message:JSValue, content:Content, fileName:String):Boolean	= controller uploadContent		(id, message, content, fileName)
 	def uploadBatchCompleted() { controller uploadBatchCompleted id }
 	
 	//------------------------------------------------------------------------------

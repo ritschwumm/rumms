@@ -9,22 +9,20 @@ import org.apache.commons.fileupload.util.Streams
 
 import org.eclipse.jetty.continuation.ContinuationSupport
 
-import scutil.Resource._
+import scutil.Implicits._
+import scutil.Types._
 import scutil.Functions._
+import scutil.Resource._
 import scutil.log.Logging
-import scutil.ext.AnyRefImplicits._
-import scutil.ext.ReaderImplicits._
-import scutil.ext.OptionImplicits._
-import scutil.ext.StringImplicits._
-import scutil.ext.InputStreamImplicits._
 
 import scjson._
 import scjson.JSNavigation._
 
-import rumms.util.Expiring
+import scwebapp.MimeType
+import scwebapp.HttpStatusCodes._
+import scwebapp.HttpImplicits._
 
-import rumms.http._
-import rumms.http.HttpImplicits._
+import rumms.util.Expiring
 
 /** delegates incoming requests to new FrontHandler instances */
 final class FrontServlet extends HttpServlet with Logging {
@@ -58,9 +56,10 @@ final class FrontServlet extends HttpServlet with Logging {
 	
 	private val conversations	= new Expiring[ConversationId,Conversation](Config.conversationTTL)
 	
-	def createConversation():ConversationId = {
+	def createConversation(remoteUser:Option[String]):ConversationId = {
 		val	conversationId	= ConversationId.next
 		val conversation	= new Conversation(conversationId, controller)
+		conversation.remoteUser	= remoteUser
 		synchronized {
 			conversations put (conversationId, conversation)
 		}
@@ -92,8 +91,10 @@ final class FrontServlet extends HttpServlet with Logging {
 			servletPrefix		+
 			"/download"			+
 			"?conversation="	+ urlEncode(conversationId.idval) +
-			"&message="			+ urlEncode(JSParser unparse message)
+			"&message="			+ urlEncode(JSMarshaller apply message)
 		}
+		def remoteUser(conversationId:ConversationId):Option[String]	=
+				getConversation(conversationId) flatMap { _.remoteUser }	
 	}
 	
 	//------------------------------------------------------------------------------
@@ -103,10 +104,6 @@ final class FrontServlet extends HttpServlet with Logging {
 	val DISCONNECTED_TEXT	= "CONNECT"
 	val UPLOADED_TEXT		= "OK"
 	val UPGRADED_TEXT		= "VERSION"
-	
-	private val textPlain		= ContentType("text", 			"plain",		Config.encoding)
-	private val textJS			= ContentType("text", 			"javascript",	Config.encoding)
-	private val applicationJSON	= ContentType("application",	"json",			Config.encoding)
 	
 	// TODO ugly hack
 	@volatile private var servletPrefix:String	= _
@@ -125,7 +122,7 @@ final class FrontServlet extends HttpServlet with Logging {
 			
 			request		setEncoding	Config.encoding
 			response	setEncoding	Config.encoding
-			response	setNoCache	()
+			response	noCache		()
 			
 			// TODO ugly hack
 			servletPrefix	= request.getContextPath + request.getServletPath
@@ -142,7 +139,7 @@ final class FrontServlet extends HttpServlet with Logging {
 				case "/comm"		=> comm(request, response)
 				case "/upload"		=> upload(request, response)
 				case "/download"	=> download(request, response)
-				case _				=> response.setStatusNotFound()
+				case _				=> response setStatus NOT_FOUND
 			}
 		}
 		catch {
@@ -176,16 +173,17 @@ final class FrontServlet extends HttpServlet with Logging {
 				val pattern	= "@{" + param._1 + "}"
 				val json	=  param._2 match {
 					case RawJS(value)	=> value
-					case value			=> JSSerialization serialize param._2
+					case value			=> JSMapper write param._2
 				}
-				val code	= JSParser unparse json
+				val code	= JSMarshaller apply json
 				raw replace (pattern, code)
 			}
 	
 	/** send javascript code for client configuration */
 	private def code(request:HttpServletRequest, response:HttpServletResponse) {
 		// TODO allow caching?
-		response sendString (textJS, clientCode)
+		response setContentType MimeTypes.textJavascript
+		response sendString clientCode
 	}
 		
 	lazy val serverVersion:String	= Config.version.toString + "/" + controller.version
@@ -194,15 +192,16 @@ final class FrontServlet extends HttpServlet with Logging {
 	//## message transfer
 	
 	/** establish a new Conversation */
-	// TODO send JSON data here
 	private def hi(request:HttpServletRequest, response:HttpServletResponse) {
+		// BETTER send JSON data here
+		response setContentType MimeTypes.textPlain
 		val	clientVersion = request.getReader use { _.readFully }
 		clientVersion match {
 			case `serverVersion`	=>
-				val	conversationId	= createConversation()
-				response sendString (textPlain, CONNECTED_TEXT + " " + conversationId.idval)
+				val	conversationId	= createConversation(request.getRemoteUser.guardNotNull)
+				response sendString (CONNECTED_TEXT + " " + conversationId.idval)
 			case _	=>
-				response sendString (textPlain, UPGRADED_TEXT + " " + serverVersion)
+				response sendString (UPGRADED_TEXT + " " + serverVersion)
 		}
 	}
 	
@@ -218,19 +217,20 @@ final class FrontServlet extends HttpServlet with Logging {
 			val dataStr	= request.getReader use { _.readFully }
 			
 			// parse batch message
-			val data			= JSParser parse dataStr
-			val conversationId	= (data / "conversation"	string)		getOrElse { INFO("conversationId missing");	response setStatusIllegalParams();	return }
-			val	clientCont		= (data / "clientCont"		long)		getOrElse { INFO("clientCont missing");		response setStatusIllegalParams();	return }
-			val	serverCont		= (data / "serverCont"		long)		getOrElse { INFO("serverCont missing");		response setStatusIllegalParams();	return }
-			val incoming		= (data / "messages"		arraySeq)	getOrElse { INFO("messages missing");		response setStatusIllegalParams();	return }
+			val data			= JSMarshaller unapply dataStr
+			val conversationId	= (data / "conversation"	string)		getOrElse { INFO("conversationId missing");	response setStatus FORBIDDEN;	return }
+			val	clientCont		= (data / "clientCont"		long)		getOrElse { INFO("clientCont missing");		response setStatus FORBIDDEN;	return }
+			val	serverCont		= (data / "serverCont"		long)		getOrElse { INFO("serverCont missing");		response setStatus FORBIDDEN;	return }
+			val incoming		= (data / "messages"		arraySeq)	getOrElse { INFO("messages missing");		response setStatus FORBIDDEN;	return }
 			
-			val conversation	= getConversation(ConversationId(conversationId)) getOrElse { response sendString (textPlain, DISCONNECTED_TEXT); 	return }
+			val conversation	= getConversation(ConversationId(conversationId)) getOrElse { response setContentType MimeTypes.textPlain; response sendString DISCONNECTED_TEXT; 	return }			
+			conversation.remoteUser	= request.remoteUser
 			
 			// give new messages to the client
 			conversation handleIncoming (incoming, clientCont)
 		
 			def compileResponse(batch:Batch):String =
-					JSParser unparse JSObject(Map(
+					JSMarshaller apply JSObject(Map(
 						JSString("clientCont")	-> JSNumber(clientCont),
 						JSString("serverCont")	-> JSNumber(batch.serverCont),
 						JSString("messages")	-> JSArray(batch.messages)
@@ -240,8 +240,8 @@ final class FrontServlet extends HttpServlet with Logging {
 			val fromConversation	= conversation fetchOutgoing serverCont
 			if (fromConversation.messages.nonEmpty) {
 				// DEBUG("sending available data immediately", continuation)
-				val	responseString	= compileResponse(fromConversation)
-				response sendString (applicationJSON, responseString)
+				response setContentType MimeTypes.applicationJSON
+				response sendString compileResponse(fromConversation)
 			}
 			else {
 				val responseThunk:Thunk[String]	= thunk {
@@ -263,8 +263,8 @@ final class FrontServlet extends HttpServlet with Logging {
 			val responseThunk:Thunk[String]	= (request getAttribute continuationAttribute).asInstanceOf[Thunk[String]]
 			if (responseThunk != null) {
 				// DEBUG("resumed continuation, using fetcher", continuation)
-				val	responseString	= responseThunk()
-				response sendString (applicationJSON, responseString)
+				response setContentType MimeTypes.applicationJSON
+				response sendString responseThunk()
 			}
 			else {
 				// DEBUG("resumed continuation with null responseThunk!!!", continuation)
@@ -280,7 +280,7 @@ final class FrontServlet extends HttpServlet with Logging {
 	
 	/** upload a file to be played */
 	private def upload(request:HttpServletRequest, response:HttpServletResponse) {
-		if (!(ServletFileUpload isMultipartContent request))	{ response setStatusIllegalParams();	return }
+		if (!(ServletFileUpload isMultipartContent request))	{ response setStatus FORBIDDEN;	return }
 		
 		var	fields:Map[String,String]				= Map.empty
 		var conversationOpt:Option[Conversation]	= None
@@ -299,11 +299,14 @@ final class FrontServlet extends HttpServlet with Logging {
 				
 				if (name == "conversation") {
 					conversationOpt	= getConversation(ConversationId(value))
-					if (conversationOpt.isEmpty) { response sendString (textPlain, DISCONNECTED_TEXT);	return }
+					if (conversationOpt.isEmpty) { response setContentType MimeTypes.textPlain; response sendString DISCONNECTED_TEXT;	return }
+					conversationOpt foreach{ conversation =>
+						conversation.remoteUser	= request.remoteUser
+					}
 				}
 				else if (name == "message") {
-					messageJSOpt	= JSParser parse value
-					if (messageJSOpt.isEmpty) { response.setStatusIllegalParams();	return }
+					messageJSOpt	= JSMarshaller unapply value
+					if (messageJSOpt.isEmpty) { response setStatus FORBIDDEN;	return }
 				}
 				else {
 					WARN("unexpected form parameter", name)
@@ -311,15 +314,15 @@ final class FrontServlet extends HttpServlet with Logging {
 			}
 			else {
 				// TODO log errors
-				val conversation	= conversationOpt	getOrElse { response.setStatusIllegalParams();	return }
-				val messageJS		= messageJSOpt		getOrElse { response.setStatusIllegalParams();	return }
+				val conversation	= conversationOpt	getOrElse { response setStatus FORBIDDEN;	return }
+				val messageJS		= messageJSOpt		getOrElse { response setStatus FORBIDDEN;	return }
 				val	size			= request.getContentLength
-				val contentType		= item.getContentType.guardNotNull map ContentType.apply getOrElse ContentType.unknown
+				val mimeType		= item.getContentType.guardNotNull flatMap MimeType.parse getOrElse MimeTypes.unknown
 				val fileName		= item.getName
 				
 				if (size == -1)	{
 					ERROR("upload stream was zero-sized", fileName)
-					response.setStatusIllegalParams()
+					response setStatus FORBIDDEN
 					return 
 				}
 				
@@ -331,17 +334,17 @@ final class FrontServlet extends HttpServlet with Logging {
 				// 	return
 				// }
 				
-				// DEBUG("upload stream running", fileName, contentType)
+				// DEBUG("upload stream running", fileName, mimeType)
 				
-				val upload	= Upload(contentType, size, stream, fileName)
+				val content	= Content(mimeType, size, stream)
 				val accepted	= 
 						try {
-							conversation handleUpload (messageJS, upload)
+							conversation uploadContent (messageJS, content, fileName)
 						}
 						catch {
 							case e =>
 								ERROR("upload stream failed", fileName, e)
-								response.setStatusIllegalParams()
+								response setStatus FORBIDDEN
 								return
 						}
 				try { stream.close() }
@@ -352,21 +355,27 @@ final class FrontServlet extends HttpServlet with Logging {
 		}
 		
 		conversationOpt foreach { _.uploadBatchCompleted() }
-		response sendString (textPlain, UPLOADED_TEXT)
+		response setContentType MimeTypes.textPlain
+		response sendString UPLOADED_TEXT
 	}
 	
 	private def download(request:HttpServletRequest, response:HttpServletResponse) {
 		// TODO log errors, use Validated
-		val conversationId	= request	paramString "conversation"	getOrElse { response setStatusIllegalParams();	return }
-		val message			= request	paramString	"message"		getOrElse { response setStatusIllegalParams();	return }
-		val messageJS		= JSParser parse message				getOrElse { response setStatusIllegalParams();	return }
-		val conversation	= getConversation(ConversationId(conversationId)) getOrElse { response  sendString (textPlain, DISCONNECTED_TEXT); 	return }
-		val	download		= conversation handleDownload messageJS
+		val conversationId	= request	paramString "conversation"	getOrElse { response setStatus FORBIDDEN;	return }
+		val message			= request	paramString	"message"		getOrElse { response setStatus FORBIDDEN;	return }
+		val messageJS		= JSMarshaller unapply message			getOrElse { response setStatus FORBIDDEN;	return }
+		val conversation	= getConversation(ConversationId(conversationId)) getOrElse { response setContentType MimeTypes.textPlain; response sendString DISCONNECTED_TEXT; 	return }
+		conversation.remoteUser	= request.remoteUser
+		val	content			= conversation downloadContent messageJS
 
-		download match {
+		content match {
 			// TODO catch exceptions for closed connections
-			case Some(download)	=> response sendDownload		download
-			case None			=> response setStatusNotFound	()
+			case Some(content)	=> 
+					response setContentType 	content.mimeType
+					response setContentLength	content.contentLength
+					response sendStream			content.inputStream
+			case None	=> 
+					response setStatus 		NOT_FOUND
 		}
 	}
 }

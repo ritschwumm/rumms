@@ -2,18 +2,18 @@ package rumms
 
 import java.io._
 import java.net._
-//import java.util._
 
 import javax.servlet._
 import javax.servlet.http._
 
-import scutil.Resource._
 import scutil.Implicits._
+import scutil.Resource._
 import scutil.validation._
 import scutil.log.Logging
 
-import rumms.http._
-import rumms.http.HttpImplicits._
+import scwebapp.MimeType
+import scwebapp.HttpStatusCodes._
+import scwebapp.HttpImplicits._
 
 final class DomServlet extends HttpServlet with Logging {
     override def init() {}
@@ -77,11 +77,11 @@ final class DomServlet extends HttpServlet with Logging {
 				(response:HttpServletResponse) => {
 					response setStatus status
 				}
-				
+			
 		def jsAction(code:String):Action	= 
 				(response:HttpServletResponse) => {
-					response setStatus		200	
-					response setContentType	("text/javascript;charset=" + Config.encoding.name)
+					response setStatus		OK	
+					response setContentType	MimeTypes.textJavascript
 					// response setContentLength	bytes.size
 					response.getWriter write code
 				}
@@ -92,7 +92,7 @@ final class DomServlet extends HttpServlet with Logging {
 			action
 		}
 			
-		response.setNoCache()	// TODO no!
+		response.noCache()	// TODO no!
 		cachedAction(response)
 	}
 }

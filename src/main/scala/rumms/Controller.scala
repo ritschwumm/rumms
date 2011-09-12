@@ -18,13 +18,13 @@ trait Controller {
 	/** an existing Conversation has been closed */
 	def conversationRemoved(conversationId:ConversationId):Unit
 	
-	/** thr browser sent a message to us */
+	/** the browser sent a message to us */
 	def receiveMessage(conversationId:ConversationId, message:JSValue):Unit
 	
 	/** the browser uploads some data. returns false if the upload was rejected */
-	def handleUpload(conversationId:ConversationId, message:JSValue, upload:Upload):Boolean
+	def uploadContent(conversationId:ConversationId, message:JSValue, content:Content, fileName:String):Boolean
 	/** the browser wants to download some data. returns None if the download was rejected. */
-	def handleDownload(conversationId:ConversationId, message:JSValue):Option[Download]
+	def downloadContent(conversationId:ConversationId, message:JSValue):Option[Content]
 	
 	/** called after a single upload request is finished, possibly after multiple calls to handleUpload */
 	def uploadBatchCompleted(conversationId:ConversationId):Unit

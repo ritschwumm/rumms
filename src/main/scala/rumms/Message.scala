@@ -1,3 +1,0 @@
-// package rumms
-
-// trait Message
