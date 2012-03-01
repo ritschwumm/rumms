@@ -1,9 +1,9 @@
 package rumms
 
-import scjson.JSValue
+import scjson.JSONValue
 
 trait ControllerContext {
-	def sendMessage(conversationId:ConversationId, message:JSValue)
-	def downloadURL(conversationId:ConversationId, message:JSValue):String
+	def sendMessage(conversationId:ConversationId, message:JSONValue)
+	def downloadURL(conversationId:ConversationId, message:JSONValue):String
 	def remoteUser(conversationId:ConversationId):Option[String]
 }

@@ -6,7 +6,7 @@ import scutil.log.Logging
 
 import scjson._
 
-case class Batch(serverCont:Long, messages:List[JSValue])
+case class Batch(serverCont:Long, messages:List[JSONValue])
 
 final class Conversation(val id:ConversationId, controller:Controller) extends Logging {
 	//------------------------------------------------------------------------------
@@ -20,7 +20,7 @@ final class Conversation(val id:ConversationId, controller:Controller) extends L
 	private var lastClientCont	= 0L
 	
 	/** client -> server */
-	def handleIncoming(incoming:Seq[JSValue], clientCont:Long) { 
+	def handleIncoming(incoming:Seq[JSONValue], clientCont:Long) { 
 		// after an aborted request there may be messages in incoming already seen before
 		synchronized {
 			val expected	= (clientCont - lastClientCont)
@@ -34,14 +34,14 @@ final class Conversation(val id:ConversationId, controller:Controller) extends L
 		}
 	}
 	
-	def downloadContent(message:JSValue):Option[Content]							= controller downloadContent	(id, message)
-	def uploadContent(message:JSValue, content:Content, fileName:String):Boolean	= controller uploadContent		(id, message, content, fileName)
+	def downloadContent(message:JSONValue):Option[Content]							= controller downloadContent	(id, message)
+	def uploadContent(message:JSONValue, content:Content, fileName:String):Boolean	= controller uploadContent		(id, message, content, fileName)
 	def uploadBatchCompleted() { controller uploadBatchCompleted id }
 	
 	//------------------------------------------------------------------------------
 	//## server -> client
 	
-	private case class Entry(id:Long, message:JSValue)
+	private case class Entry(id:Long, message:JSONValue)
 	
 	private var	nextId	= 0
 	
@@ -49,7 +49,7 @@ final class Conversation(val id:ConversationId, controller:Controller) extends L
 	private var publishers:Option[()=>Unit]	= None
 	
 	/** server -> client */
-	def appendOutgoing(message:JSValue) {
+	def appendOutgoing(message:JSONValue) {
 		synchronized {
 			val entry	= Entry(nextId, message)
 			

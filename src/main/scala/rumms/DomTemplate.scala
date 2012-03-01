@@ -7,8 +7,8 @@ import scala.io.Source
 import scala.xml._
 import scala.xml.parsing.ConstructingParser
 
-import scutil.validation._
-import scutil.validation.SimpleSafety._
+import scfunk.validation._
+import scfunk.validation.SimpleSafety._
 
 object DomTemplate {
 	def compile(file:File):Safe[String]   =

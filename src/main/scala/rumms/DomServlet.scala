@@ -8,14 +8,17 @@ import javax.servlet.http._
 
 import scutil.Implicits._
 import scutil.Resource._
-import scutil.validation._
 import scutil.log.Logging
 
-import scwebapp.MimeType
+import scfunk.validation._
+
 import scwebapp.HttpStatusCodes._
 import scwebapp.HttpImplicits._
+import scwebapp.StandardMimeTypes._
 
 final class DomServlet extends HttpServlet with Logging {
+    private val text_javascript_charset	= text_javascript	attribute ("charset", Config.encoding.name)
+	
     override def init() {}
 	override def destroy() {}
     
@@ -81,7 +84,7 @@ final class DomServlet extends HttpServlet with Logging {
 		def jsAction(code:String):Action	= 
 				(response:HttpServletResponse) => {
 					response setStatus		OK	
-					response setContentType	MimeTypes.textJavascript
+					response setContentType	text_javascript_charset
 					// response setContentLength	bytes.size
 					response.getWriter write code
 				}
