@@ -228,11 +228,11 @@ final class FrontServlet extends HttpServlet with Logging {
 			conversation handleIncoming (incoming, clientCont)
 		
 			def compileResponse(batch:Batch):String =
-					JSONMarshaller apply JSONObject(Map(
-						JSONString("clientCont")	-> JSONNumber(clientCont),
-						JSONString("serverCont")	-> JSONNumber(batch.serverCont),
-						JSONString("messages")		-> JSONArray(batch.messages)
-					))
+					JSONMarshaller apply JSONVarObject(
+						"clientCont"	-> JSONNumber(clientCont),
+						"serverCont"	-> JSONNumber(batch.serverCont),
+						"messages"		-> JSONArray(batch.messages)
+					)
 				
 			// maybe there already are new messages
 			val fromConversation	= conversation fetchOutgoing serverCont

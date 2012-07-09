@@ -7,10 +7,12 @@ import scala.io.Source
 import scala.xml._
 import scala.xml.parsing.ConstructingParser
 
-import scfunk.validation._
-import scfunk.validation.SimpleSafety._
+import scalaz.{ Node => ZNode, Source => ZSource, _ }
+import Scalaz._
 
 object DomTemplate {
+	type Safe[T]	= ValidationNEL[String,T]
+	
 	def compile(file:File):Safe[String]   =
 			for {
 				xml		<- loadXML(file)
@@ -27,18 +29,18 @@ object DomTemplate {
 	
 	def loadXML(file:File):Safe[Node] =
 			try {
-				valid(ConstructingParser.fromFile(file, true).document.docElem)
+				ConstructingParser.fromFile(file, true).document.docElem.success
 			}
 			catch {
-				case e	=> 	invalid("loading xml failed: " + file.getPath + " cause: " + e.getMessage)
+				case e	=> 	("loading xml failed: " + file.getPath + " cause: " + e.getMessage).fail.liftFailNel
 			}
 			
 	def parseXML(string:String):Safe[Node]	=
 			try {
-				valid(ConstructingParser.fromSource(Source fromString string, true).document.docElem)
+				ConstructingParser.fromSource(Source fromString string, true).document.docElem.success
 			}
 			catch {
-				case e	=> invalid("parsing xml failed: " + e.getMessage)
+				case e	=> ("parsing xml failed: " + e.getMessage).fail.liftFailNel
 			}
 			
 	//------------------------------------------------------------------------------
@@ -75,33 +77,32 @@ object DomTemplate {
 				val ownRef		= attrText(x, hash).toOption map { VarRef(_, varName) } 
 				
 				val	subResults	= x.child map compileNode
-				val subProblems	= subResults flatMap { _.invalid.toOption }
-				if (subProblems.isEmpty) {
-					val sub			= subResults flatMap { _.toOption }
-					val subCodes	= sub map { _.code }
-					val subRefs		= sub.toList flatMap { _.refs }
-					val appends		= sub flatMap { it => it.varName map { jt => varName + ".appendChild(" + jt + ");" } }
-					
-					val code	= (subCodes ++ List(ownCreate) ++ ownAttrs ++ appends) mkString "\n"
-					val refs	= ownRef.toList ++ subRefs
-					valid(Compiled(code, Some(varName), refs))
-				}
-				else {
-					val subFlat	= subProblems map { _.toList } flatten;
-					invalidMulti(subFlat)
+				// TODO use applicative accumulation somehow
+				val subProblems:Seq[NonEmptyList[String]]	= subResults flatMap { _.fail.toOption }
+				subProblems.toList.toNel match {
+					case Some(nel)	=> 	nel flatMap identity fail;
+					case None		=>
+						val sub			= subResults flatMap { _.toOption }
+						val subCodes	= sub map { _.code }
+						val subRefs		= sub.toList flatMap { _.refs }
+						val appends		= sub flatMap { it => it.varName map { jt => varName + ".appendChild(" + jt + ");" } }
+						
+						val code	= (subCodes ++ List(ownCreate) ++ ownAttrs ++ appends) mkString "\n"
+						val refs	= ownRef.toList ++ subRefs
+						Compiled(code, Some(varName), refs).success
 				}
 				
 			case x:Text	=>
 				val	varName	= freshName()
 				val	create	= "var " + varName + " = document.createTextNode(" + escape(x.text) + ");"
-				valid(Compiled(create, Some(varName), Nil))
+				Compiled(create, Some(varName), Nil).success
 			
 			case Comment(text)	=>
 				val	comment	= "/* " + text + " */"	// TODO escape */
-				valid(Compiled(comment, None, Nil))
+				Compiled(comment, None, Nil).success
 				
 			case _ => 
-				invalid("unexpected node: " + node) 
+				("unexpected node: " + node).fail.liftFailNel 
 		}
 		
 		compileNode(elem)
@@ -117,9 +118,8 @@ object DomTemplate {
 			case _								=> ()
 		}
 		val	duplicates	= dups map { "duplicate id: " + _ }
-		val problems	= hasDollar.toList ++ duplicates
-		if (problems.isEmpty)	valid(compiled)
-		else					invalidMulti(problems)
+		val problems:List[String]	= hasDollar.toList ++ duplicates
+		problems.toNel toFailure compiled
 	}	
 	
 	private def function(name:String, compiled:Compiled):String	=
@@ -140,12 +140,12 @@ object DomTemplate {
 	
 	private def toplevelElem(node:Node):Safe[Elem]	=
 			node match {
-				case x:Elem => valid(x)
-				case _		=> invalid("expected element at toplevel")
+				case x:Elem => x.success
+				case _		=> "expected element at toplevel".fail.liftFailNel
 			}
 			
 	private def attrText(elem:Elem, key:String):Safe[String]	=
-			elem.attributes find (_.key == key) map (_.value.text) elseInvalid ("missing attribute: " + key)
+			elem.attributes find (_.key == key) map (_.value.text) toSuccess nel("missing attribute: " + key)
 	
 	private def escape(s:String) = 
 			s map {

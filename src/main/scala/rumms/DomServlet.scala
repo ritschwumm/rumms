@@ -6,11 +6,12 @@ import java.net._
 import javax.servlet._
 import javax.servlet.http._
 
+import scalaz._
+import Scalaz._
+
 import scutil.Implicits._
 import scutil.Resource._
 import scutil.log.Logging
-
-import scfunk.validation._
 
 import scwebapp.HttpStatusCodes._
 import scwebapp.HttpImplicits._
@@ -54,15 +55,15 @@ final class DomServlet extends HttpServlet with Logging {
 									case Some(url)	=>
 										// TODO handle exceptions
 										val text	= new InputStreamReader(url.openStream, Config.encoding.name) use { _.readFully }
-										DomTemplate compile text match {
-											case Valid(js)	=> 
-												// DEBUG("compiled DOM for path", path)
-												jsAction(js)
-											case Invalid(err)  =>
+										DomTemplate compile text fold (
+											err => {
 												ERROR("cannot compile DOM for path", path)
-												ERROR(err.toList:_*)
+												ERROR(err.list:_*)
 												errorAction(500)
-										}
+											},
+											// DEBUG("compiled DOM for path", path)
+											jsAction
+										)
 									case None		=>
 										ERROR("resource not found for path", path)
 										errorAction(400)

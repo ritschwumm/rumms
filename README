@@ -10,7 +10,6 @@ To build this code, get and install SBT from
 
 Get and install these library/libraries before building:
 	https://github.com/ritschwumm/scutil
-	https://github.com/ritschwumm/scfunk
 	https://github.com/ritschwumm/scmirror
 	https://github.com/ritschwumm/scjson
 	https://github.com/ritschwumm/scwebapp
