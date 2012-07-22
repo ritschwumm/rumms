@@ -2,17 +2,20 @@ package rumms
 
 import java.io.InputStream
 
+import scutil.time._
 import scutil.log.Logging
 
 import scjson._
-
-case class Batch(serverCont:Long, messages:List[JSONValue])
 
 final class Conversation(val id:ConversationId, controller:Controller) extends Logging {
 	//------------------------------------------------------------------------------
 	//## state
 	
-	@volatile private[rumms] var remoteUser	= None:Option[String]
+	@volatile private[rumms] var remoteUser:Option[String]	= None
+	
+	@volatile private var touched:Instant	= Instant.zero
+	def alive:Boolean	= touched + Config.conversationTTL > Instant.now
+	def touch()			{ touched = Instant.now }
 	
 	//------------------------------------------------------------------------------
 	//## client -> server

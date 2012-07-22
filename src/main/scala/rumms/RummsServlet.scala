@@ -18,26 +18,24 @@ import scjson._
 import scjson.JSONNavigation._
 
 import scwebapp.MimeType
-import scwebapp.HttpStatusCodes._
+import scwebapp.HttpStatusEnum._
 import scwebapp.HttpImplicits._
 import scwebapp.StandardMimeTypes._
 
-import rumms.util.Expiring
-
-/** delegates incoming requests to new FrontHandler instances */
-final class FrontServlet extends HttpServlet with Logging {
+/** delegates incoming requests to new Controller instances */
+final class RummsServlet extends HttpServlet with Logging {
 	private val text_plain_charset		= text_plain		attribute ("charset", Config.encoding.name)
 	private val text_javascript_charset	= text_javascript	attribute ("charset", Config.encoding.name)
 	
 	//------------------------------------------------------------------------------
 	//## life cycle
 	
-	val CONTROLLER	= "controller"
+	private val CONTROLLER_PARAMETER	= "controller"
 	
 	@volatile var controller:Controller	= null
 	
 	override def init() {
-		val className	= getInitParameter(CONTROLLER)
+		val className	= getInitParameter(CONTROLLER_PARAMETER)
 		INFO("loading controller", className)
 		try {
 			controller	= (Class forName className getConstructor classOf[ControllerContext] newInstance controllerContext).asInstanceOf[Controller]
@@ -57,56 +55,46 @@ final class FrontServlet extends HttpServlet with Logging {
 	//------------------------------------------------------------------------------
 	//## conversation management
 	
-	private val conversations	= new Expiring[ConversationId,Conversation](Config.conversationTTL)
+	private val conversations	= new ConversationManager
 	
-	def createConversation(remoteUser:Option[String]):ConversationId = {
+	private def createConversation(remoteUser:Option[String]):ConversationId = {
 		val	conversationId	= ConversationId.next
 		val conversation	= new Conversation(conversationId, controller)
 		conversation.remoteUser	= remoteUser
-		synchronized {
-			conversations put (conversationId, conversation)
-		}
+		conversations put conversation
 		controller conversationAdded conversationId
 		conversationId
 	}
 	
-	def getConversation(conversationId:ConversationId):Option[Conversation] =  {
-		synchronized { 
-			conversations get conversationId
-		}
+	private def expireConversations() {
+		conversations.expire().map { _.id } foreach controller.conversationRemoved
 	}
 	
-	def expireConversations() {
-		synchronized { 
-			conversations.expire() 
-		} 
-		.foreach {
-			controller conversationRemoved _.id 
+	private val controllerContext	= new ControllerContext {
+		def sendMessage(receiver:ConversationId, message:JSONValue) {
+			conversations get receiver foreach { _ appendOutgoing message }
 		}
-	}
-	
-	val controllerContext	= new ControllerContext {
-		def sendMessage(conversationId:ConversationId, message:JSONValue) {
-			getConversation(conversationId) foreach { _ appendOutgoing message }
+		def broadcastMessage(receiver:Predicate[ConversationId], message:JSONValue) {
+			conversations find receiver foreach { _ appendOutgoing message }
 		}
-		def downloadURL(conversationId:ConversationId, message:JSONValue):String = {
+		def downloadURL(receiver:ConversationId, message:JSONValue):String = {
 			def urlEncode(s:String):String	= URLEncoder encode (s, Config.encoding.name)
 			servletPrefix		+
 			"/download"			+
-			"?conversation="	+ urlEncode(conversationId.idval) +
+			"?conversation="	+ urlEncode(receiver.idval) +
 			"&message="			+ urlEncode(JSONMarshaller apply message)
 		}
 		def remoteUser(conversationId:ConversationId):Option[String]	=
-				getConversation(conversationId) flatMap { _.remoteUser }	
+				conversations get conversationId flatMap { _.remoteUser }	
 	}
 	
 	//------------------------------------------------------------------------------
 	//## request handling
 	
-	val CONNECTED_TEXT		= "OK"
-	val DISCONNECTED_TEXT	= "CONNECT"
-	val UPLOADED_TEXT		= "OK"
-	val UPGRADED_TEXT		= "VERSION"
+	private val CONNECTED_TEXT		= "OK"
+	private val DISCONNECTED_TEXT	= "CONNECT"
+	private val UPLOADED_TEXT		= "OK"
+	private val UPGRADED_TEXT		= "VERSION"
 	
 	// TODO ugly hack
 	@volatile private var servletPrefix:String	= _
@@ -129,12 +117,6 @@ final class FrontServlet extends HttpServlet with Logging {
 			
 			// TODO ugly hack
 			servletPrefix	= request.getContextPath + request.getServletPath
-			/*
-			println("### getContextPath="	+ request.getContextPath)	// ""
-			println("### getServletPath="	+ request.getServletPath)	// "/rumms"
-			println("### getPathInfo="		+ request.getPathInfo)		// "/comm"
-			println("### servletPrefix="	+ servletPrefix)
-			*/
 			
 			request.getPathInfo match {
 				case "/code"		=> code(request, response)
@@ -184,7 +166,7 @@ final class FrontServlet extends HttpServlet with Logging {
 		response sendString clientCode
 	}
 		
-	lazy val serverVersion:String	= Config.version.toString + "/" + controller.version
+	private lazy val serverVersion:String	= Config.version.toString + "/" + controller.version
 	
 	//------------------------------------------------------------------------------
 	//## message transfer
@@ -221,7 +203,7 @@ final class FrontServlet extends HttpServlet with Logging {
 			val	serverCont		= (data / "serverCont"		long)		getOrElse { INFO("serverCont missing");		response setStatus FORBIDDEN;	return }
 			val incoming		= (data / "messages"		arraySeq)	getOrElse { INFO("messages missing");		response setStatus FORBIDDEN;	return }
 			
-			val conversation	= getConversation(ConversationId(conversationId)) getOrElse { response setContentType text_plain_charset; response sendString DISCONNECTED_TEXT; 	return }			
+			val conversation	= conversations use ConversationId(conversationId) getOrElse { response setContentType text_plain_charset; response sendString DISCONNECTED_TEXT; 	return }			
 			conversation.remoteUser	= request.remoteUser
 			
 			// give new messages to the client
@@ -313,11 +295,9 @@ final class FrontServlet extends HttpServlet with Logging {
 				fields	= fields + (name -> value)
 				
 				if (name == "conversation") {
-					conversationOpt	= getConversation(ConversationId(value))
+					conversationOpt	= conversations use ConversationId(value)
 					if (conversationOpt.isEmpty) { response setContentType text_plain_charset; response sendString DISCONNECTED_TEXT;	return }
-					conversationOpt foreach{ conversation =>
-						conversation.remoteUser	= request.remoteUser
-					}
+					conversationOpt foreach { _.remoteUser	= request.remoteUser }
 				}
 				else if (name == "message") {
 					messageJSOpt	= JSONMarshaller unapply value
@@ -379,7 +359,7 @@ final class FrontServlet extends HttpServlet with Logging {
 		val conversationId	= request	paramString "conversation"	getOrElse { response setStatus FORBIDDEN;	return }
 		val message			= request	paramString	"message"		getOrElse { response setStatus FORBIDDEN;	return }
 		val messageJS		= JSONMarshaller unapply message		getOrElse { response setStatus FORBIDDEN;	return }
-		val conversation	= getConversation(ConversationId(conversationId)) getOrElse { response setContentType text_plain_charset; response sendString DISCONNECTED_TEXT; 	return }
+		val conversation	= conversations use ConversationId(conversationId) getOrElse { response setContentType text_plain_charset; response sendString DISCONNECTED_TEXT; 	return }
 		conversation.remoteUser	= request.remoteUser
 		val	content			= conversation downloadContent messageJS
 

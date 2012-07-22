@@ -1,9 +1,9 @@
-A little framework for AJAX-based web applications specifically written for developers 
-who like to keep it small and know scala, javascript, html and css well.
+Bidirectional message channel between a servlet container and a browser.
 
-Mainly consists of
-a) a bidirectional message channel between browser and server
-b) a templating mechanism for DOM fragments
+Facts
+-	uses only a single HTTP connection
+-	built on top of jetty continuations
+-	messages are JSON encoded
 
 To build this code, get and install SBT from 
 	https://github.com/harrah/xsbt
@@ -18,3 +18,47 @@ Use these commands to build:
 	git clone git@github.com:ritschwumm/rumms.git
 	cd rumms
 	sbt publish-local
+
+Usage
+
+	Add this servlet to your web.xml
+	
+		<servlet>
+			<servlet-name>RummsServlet</servlet-name>
+			<servlet-class>rumms.RummsServlet</servlet-class>
+			<load-on-startup>100</load-on-startup>
+			<init-param>
+				<param-name>controller</param-name>
+				<param-value>DemoController</param-value>
+			</init-param>
+		</servlet>
+		<servlet-mapping>
+			<servlet-name>RummsServlet</servlet-name>
+			<url-pattern>/rumms/*</url-pattern>
+		</servlet-mapping>
+	
+	In your server, write a controller class that 
+	-	extends the trait rumms.Controller
+	-	takes a single argument of type rumms.ControllerContext
+	-	name it demo.DemoController
+	
+		package demo
+		import rumms._
+		final class DemoController(ctx:ControllerContext) extends Controller {
+			// ...
+		}
+	
+	In the webapp, include the client code like this
+	
+		<script type="text/javascript" src="rumms/code?_="></script>
+	
+	and connect to the server like this
+	
+		var conversation = new rumms.Conversation({
+			connected:		handleConnect,
+			disconnected:	handleDisconnect,
+			upgraded:		handleUpgrade,
+			message:		handleMessage,
+			error:			handleError//,
+		});
+		conversation.connect();

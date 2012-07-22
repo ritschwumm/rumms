@@ -1,7 +1,5 @@
 package rumms
 
-import rumms.util.IdGenerator
-
 object ConversationId {
 	private val gen	= new IdGenerator
 	

@@ -1,4 +1,4 @@
-package rumms.util
+package rumms
 
 import java.security.SecureRandom
 
