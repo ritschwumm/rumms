@@ -1,6 +1,6 @@
 package rumms
 
-import scutil.Functions._
+import scutil.lang._
 import scutil.time._
 
 final class ConversationManager {

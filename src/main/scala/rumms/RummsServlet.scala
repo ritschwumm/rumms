@@ -9,7 +9,7 @@ import org.apache.commons.fileupload.util.Streams
 
 import org.eclipse.jetty.continuation.ContinuationSupport
 
-import scutil.Functions._
+import scutil.lang._
 import scutil.Implicits._
 import scutil.Resource._
 import scutil.log.Logging
