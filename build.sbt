@@ -2,14 +2,14 @@ name			:= "rumms"
 
 organization	:= "de.djini"
 
-version			:= "0.9.0"
+version			:= "0.10.0"
 
 scalaVersion	:= "2.9.2"
 
 libraryDependencies	++= Seq(
-	"de.djini"					%%	"scutil"				% "0.10.0"				% "compile",
-	"de.djini"					%%	"scjson"				% "0.10.0"				% "compile",
-	"de.djini"					%%	"scwebapp"				% "0.7.0"				% "compile",
+	"de.djini"					%%	"scutil"				% "0.11.0"				% "compile",
+	"de.djini"					%%	"scjson"				% "0.11.0"				% "compile",
+	"de.djini"					%%	"scwebapp"				% "0.8.0"				% "compile",
 	"org.scalaz"				%%	"scalaz-core"			% "6.0.4"				% "compile",
 	"commons-fileupload"		%	"commons-fileupload"	% "1.2.2"				% "compile",
 	"org.eclipse.jetty"			%	"jetty-continuation"	% "8.1.5.v20120716"		% "compile",
