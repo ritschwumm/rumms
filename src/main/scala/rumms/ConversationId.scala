@@ -1,10 +1,10 @@
 package rumms
 
 object ConversationId {
-	private val gen	= new IdGenerator
+	private val gen	= new IdGenerator(Config.secureIds)
 	
 	def next:ConversationId	= synchronized {
-		ConversationId(gen.nextId()) 
+		ConversationId(IdString write gen.next) 
 	}
 }
 

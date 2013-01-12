@@ -10,4 +10,5 @@ object Config {
 	val continuationTTL	= Duration.minute	* 1
 	val clientTTL		= continuationTTL	* 2
 	val conversationTTL	= clientTTL			* 3
+	val secureIds		= false
 }

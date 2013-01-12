@@ -1,15 +1,18 @@
 package rumms
 
+import java.util.Random
 import java.security.SecureRandom
 
-import scutil.Sequence
-
-/** creates randomized, unique ids */
-final class IdGenerator {
-	val maxLen	= 16*2+1	// 2 longs as hex and one separator
+/** creates randomized, unique ids. unsynchronized. */
+final class IdGenerator(secure:Boolean) {
+	private var counterValue:Long	= -1
 	
-	private val sequence	= new Sequence
-	private val	random		= SecureRandom getInstance "SHA1PRNG"
+	private val	randomGenerator		= 
+			if (secure)	SecureRandom getInstance "SHA1PRNG"
+			else		new Random
 	
-	def nextId():String	= random.nextLong().toHexString + "-" + sequence.next().toHexString
+	def next:Id	= Id(
+			{ counterValue += 1; counterValue },
+			System.currentTimeMillis,
+			randomGenerator.nextLong())
 }

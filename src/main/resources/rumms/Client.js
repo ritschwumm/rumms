@@ -1,10 +1,15 @@
 var rumms	= {};
 /*// type hint
 var ConversationContext = {
+	// a new client has connected
 	connected:		function(conversationId)
+	// a client has disconnected
 	disconnected:	function(conversationId)
+	// the server uses a different protocol version than the client
 	upgraded:		function(version)
+	// the server sent a message
 	message:		function(object)
+	// the connection failed
 	error:			function(object)
 };
 */
