@@ -37,6 +37,7 @@ rumms.Conversation.prototype = {
 	pollDelay:	500,
 	
 	//------------------------------------------------------------------------------
+	//## public api
 	
 	connect: function() {
 		this.hiLoop();
@@ -48,8 +49,58 @@ rumms.Conversation.prototype = {
 		this.commImmediate();
 	},
 	
+	downloadBaseURL: function() {
+		return this.servletPrefix	+ "/download";
+	},
+	
+	downloadURL: function(message) {
+		return this.downloadBaseURL()
+				+ "?conversation="	+ encodeURIComponent(this.conversationId)
+				+ "&message="		+ encodeURIComponent(JSON.stringify(message));
+	},
+	
+	uploadBaseURL: function() {
+		return this.servletPrefix + "/upload";
+	},
+	
+	/*
+	// type hint
+	var uploadContext	= {
+		start:		function()							{},
+		error:		function()							{},
+		abort:		function()							{},
+		load:		function()							{},
+		timeout:	function()							{},
+		progress:	function(computable, loaded, total)	{},
+		status:		function(status)					{}
+	}
+	*/
+	upload: function(file, message, context) {
+		var xhr = new XMLHttpRequest();
+		xhr.upload.addEventListener("loadstart",	function() 		{ context.start();							}, false);
+		xhr.upload.addEventListener("error",		function() 		{ context.error();							}, false);
+		xhr.upload.addEventListener("abort",		function() 		{ context.abort();							}, false);
+		xhr.upload.addEventListener("load",			function() 		{ context.load();							}, false);
+		xhr.upload.addEventListener("timeout",		function() 		{ context.timeout();						}, false);
+		xhr.upload.addEventListener("progress",		function(ev)	{ context.progress(ev.lengthComputable, ev.loaded, ev.total);	}, false);
+		xhr.onreadystatechange	= function(ev) {
+			if (xhr.readyState !== 4)	return;
+			context.status(xhr.status);
+		}
+		// TODO xhr.timeout	= 5000 // millis
+		
+		var form	= new FormData();
+		form.append("conversation",	this.conversationId);
+		form.append("message",		JSON.stringify(message));
+		form.append("file",			file,	file.name);
+		
+		xhr.open("POST", this.uploadBaseURL(), true);
+		xhr.send(form);
+	},
+	
 	//------------------------------------------------------------------------------
-
+	//## private connect
+	
 	hiLoop: function() {
 		var self	= this;
 		var	client	= new XMLHttpRequest();
@@ -113,6 +164,7 @@ rumms.Conversation.prototype = {
 	},
 	
 	//------------------------------------------------------------------------------
+	//## private message
 	
 	commLoop: function() {
 		if (!this.connected)	return;
@@ -225,6 +277,7 @@ rumms.Conversation.prototype = {
 	},
 	
 	//------------------------------------------------------------------------------
+	//## private util
 	
 	notifyError: function(method, description, exception, details) {
 		this.context.error({
@@ -235,3 +288,6 @@ rumms.Conversation.prototype = {
 		});
 	}//,
 };
+if (!(new XMLHttpRequest().upload) || !FormData) {
+	rumms.Conversation.prototype.upload	= null;
+}
