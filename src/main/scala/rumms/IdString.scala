@@ -20,6 +20,6 @@ object IdString extends Marshaller[Id,String] {
 						JLong parseLong (it.substring (32,48),	16)))
 			}
 			catch {
-				case e	=> None
+				case e:Exception	=> None
 			}
 }

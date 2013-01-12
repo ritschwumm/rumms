@@ -42,7 +42,7 @@ final class RummsServlet extends HttpServlet with Logging {
 			INFO("controller loaded")
 		}
 		catch {
-			case e	=>
+			case e:Exception	=>
 				INFO("cannot load controller", e)
 				throw e
 		}
@@ -128,7 +128,7 @@ final class RummsServlet extends HttpServlet with Logging {
 			}
 		}
 		catch {
-			case e => 
+			case e:Exception => 
 				ERROR(e)
 				throw e
 		}
@@ -337,13 +337,13 @@ final class RummsServlet extends HttpServlet with Logging {
 							conversation uploadContent (messageJS, content, fileName)
 						}
 						catch {
-							case e =>
+							case e:Exception =>
 								ERROR("upload stream failed", fileName, e)
 								response setStatus FORBIDDEN
 								return
 						}
 				try { stream.close() }
-				catch { case e	=> /* may already be closed */ }
+				catch { case e:Exception	=> /* may already be closed */ }
 				
 				// DEBUG("upload stream done", fileName, accepted)
 			}
