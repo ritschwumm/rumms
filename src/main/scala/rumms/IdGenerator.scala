@@ -2,17 +2,20 @@ package rumms
 
 import java.util.Random
 import java.security.SecureRandom
+import java.util.concurrent.atomic.AtomicLong
 
-/** creates randomized, unique ids. unsynchronized. */
+// TODO not safe for use in a cluster
+
+/** creates randomized, unique ids. no synchronization necessary. */
 final class IdGenerator(secure:Boolean) {
-	private var counterValue:Long	= -1
+	private val counter:AtomicLong	= new AtomicLong
 	
-	private val	randomGenerator		= 
+	private val	random	= 
 			if (secure)	SecureRandom getInstance "SHA1PRNG"
 			else		new Random
 	
-	def next:Id	= Id(
-			{ counterValue += 1; counterValue },
+	def next():Id	= Id(
+			counter.incrementAndGet,
 			System.currentTimeMillis,
-			randomGenerator.nextLong())
+			random.nextLong())
 }
