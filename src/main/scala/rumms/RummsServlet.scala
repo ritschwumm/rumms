@@ -1,15 +1,12 @@
 package rumms
 
 import java.io.InputStreamReader
+import java.io.IOException
 import java.net.URLEncoder
+import javax.servlet._
 import javax.servlet.http._
 
-import org.apache.commons.fileupload.servlet.ServletFileUpload
-import org.apache.commons.fileupload.util.Streams
-import org.apache.commons.fileupload.FileItemIterator
-import org.apache.commons.fileupload.FileItemStream
-	
-import org.eclipse.jetty.continuation.ContinuationSupport
+import scala.collection.JavaConverters._
 
 import scutil.lang._
 import scutil.Implicits._
@@ -43,10 +40,9 @@ final class RummsServlet extends HttpServlet with Logging {
 			controller	= (Class forName className getConstructor classOf[ControllerContext] newInstance controllerContext).asInstanceOf[Controller]
 			INFO("controller loaded")
 		}
-		catch {
-			case e:Exception	=>
-				INFO("cannot load controller", e)
-				throw e
+		catch { case e:Exception	=>
+			INFO("cannot load controller", e)
+			throw e
 		}
 	}
 	override def destroy() {
@@ -125,10 +121,9 @@ final class RummsServlet extends HttpServlet with Logging {
 				case _				=> NotFound(response)
 			}
 		}
-		catch {
-			case e:Exception => 
-				ERROR(e)
-				throw e
+		catch { case e:Exception => 
+			ERROR(e)
+			throw e
 		}
 	}
 	
@@ -179,88 +174,81 @@ final class RummsServlet extends HttpServlet with Logging {
 		action apply response
 	}
 	
-	private val continuationAttribute	= "CONT"
-	
 	/** receive and send messages for a single Conversation */
 	private def comm(request:HttpServletRequest, response:HttpServletResponse) {
-		val continuation	= ContinuationSupport getContinuation request
+		val dataStr	= request.getReader use { _.readFully }
+		
 		val action	=
-				if (continuation.isInitial) {
-					// DEBUG("initial continuation, reading data from request", continuation)
-					val dataStr	= request.getReader use { _.readFully }
-					for {
-						data			<- JSONMarshaller unapply dataStr	toWin (Forbidden,		"invalid message")
-						conversationId	<- (data / "conversation").string	toWin (Forbidden,		"conversationId missing")	map ConversationId.apply
-						clientCont		<- (data / "clientCont").long		toWin (Forbidden,		"clientCont missing")
-						serverCont		<- (data / "serverCont").long		toWin (Forbidden,		"serverCont missing")
-						incoming		<- (data / "messages").arraySeq		toWin (Forbidden,		"messages missing")
-						conversation	<- conversations use conversationId	toWin (Disconnected,	"unknown conversation")
-					}
-					yield {
-						conversation.remoteUser	= request.remoteUser
-						
-						// give new messages to the client
-						conversation handleIncoming (incoming, clientCont)
+				for {
+					data			<- JSONMarshaller unapply dataStr	toWin (Forbidden,		"invalid message")
+					conversationId	<- (data / "conversation").string	toWin (Forbidden,		"conversationId missing")	map ConversationId.apply
+					clientCont		<- (data / "clientCont").long		toWin (Forbidden,		"clientCont missing")
+					serverCont		<- (data / "serverCont").long		toWin (Forbidden,		"serverCont missing")
+					incoming		<- (data / "messages").arraySeq		toWin (Forbidden,		"messages missing")
+					conversation	<- conversations use conversationId	toWin (Disconnected,	"unknown conversation")
+				}
+				yield {
+					conversation.remoteUser	= request.remoteUser
 					
-						def compileResponse(batch:Batch):String =
-								JSONMarshaller apply JSONVarObject(
-									"clientCont"	-> JSONNumber(clientCont),
-									"serverCont"	-> JSONNumber(batch.serverCont),
-									"messages"		-> JSONArray(batch.messages)
-								)
-							
-						// maybe there already are new messages
-						val fromConversation	= conversation fetchOutgoing serverCont
-						if (fromConversation.messages.nonEmpty) {
-							// DEBUG("sending available data immediately", continuation)
-							BatchRespose(compileResponse(fromConversation))
+					// give new messages to the client
+					conversation handleIncoming (incoming, clientCont)
+					
+					def compileResponse(batch:Batch):String =
+							JSONMarshaller apply JSONVarObject(
+								"clientCont"	-> JSONNumber(clientCont),
+								"serverCont"	-> JSONNumber(batch.serverCont),
+								"messages"		-> JSONArray(batch.messages)
+							)
+						
+					// maybe there already are new messages
+					val fromConversation	= conversation fetchOutgoing serverCont
+					if (fromConversation.messages.nonEmpty) {
+						// DEBUG("sending available data immediately", continuation)
+						BatchRespose(compileResponse(fromConversation))
+					}
+					else {
+						val asyncCtx	= request.startAsync()
+						asyncCtx setTimeout Config.continuationTTL.millis
+						
+						def sendBack() {
+							val	asyncResponse	= asyncCtx.getResponse.asInstanceOf[HttpServletResponse]
+							BatchRespose(compileResponse(conversation fetchOutgoing serverCont)) apply asyncResponse
+							asyncCtx.complete()
 						}
-						else {
-							val responseThunk:Thunk[String]	= thunk {
-								val fromLater	= conversation fetchOutgoing serverCont
-								compileResponse(fromLater)
+						
+						@volatile var alive		= true
+						// all throws IOException
+						asyncCtx addListener new AsyncListener {
+							def onStartAsync(ev:AsyncEvent)	{}
+							def onComplete(ev:AsyncEvent)	{ 
+								alive	= false	
 							}
-							
-							// DEBUG("suspending continuation to delay response", continuation)
-							// fetch again later and resume the continuation
-							continuation.setTimeout(Config.continuationTTL.millis)
-							continuation setAttribute (continuationAttribute, responseThunk)
-							continuation.suspend()
-							conversation onHasOutgoing thunk {
-								// DEBUG("resuming continuation", continuation)	
-								if (continuation.isSuspended) {
-									continuation.resume()
-								}
-								else {
-									// NOTE not checking isSuspended lead to a
-									// java.lang.IllegalStateException: REDISPATCHED,resumed,expired
-									WARN("cannot resume non-suspended continuation", continuation)
-								}
+							def onTimeout(ev:AsyncEvent)	{ 
+								alive	= false
+								val	asyncResponse	= asyncCtx.getResponse.asInstanceOf[HttpServletResponse]
+								BatchRespose(compileResponse(conversation fetchOutgoing serverCont)) apply asyncResponse
+								asyncCtx.complete()
+							}	
+							def onError(ev:AsyncEvent)		{
+								alive	= false
+								val	asyncResponse	= asyncCtx.getResponse.asInstanceOf[HttpServletResponse]
+								InternalError apply asyncResponse
+								asyncCtx.complete()
 							}
-							
-							Ignore
 						}
+						
+						conversation onHasOutgoing thunk {
+							if (alive) {
+								val	asyncResponse	= asyncCtx.getResponse.asInstanceOf[HttpServletResponse]
+								BatchRespose(compileResponse(conversation fetchOutgoing serverCont)) apply asyncResponse
+								asyncCtx.complete()
+							}
+						}
+						
+						Ignore
 					}
 				}
-				else if (continuation.isResumed || continuation.isExpired) {
-					for {
-						contAttr		<- (request getAttribute continuationAttribute).guardNotNull toWin (Ignore, "resumed continuation with null responseThunk")
-						responseThunk	<-
-								try {
-									Win(contAttr.asInstanceOf[Thunk[String]])
-								}
-								catch { case e:ClassCastException =>
-									Fail((Ignore, "cannot use continuation, scala.Function0 comes from different ClassLoaders"))
-								}
-					}
-					yield {
-						// DEBUG("resumed continuation, using fetcher", continuation)
-						BatchRespose(responseThunk())
-					}
-				}
-				else {
-					Fail((Ignore, "unexpected continuation state"))
-				}
+				
 		action.swap map { _._2 } foreach (ERROR(_))
 		action cata (_._1, identity) apply response 
 	}
@@ -268,93 +256,85 @@ final class RummsServlet extends HttpServlet with Logging {
 	//------------------------------------------------------------------------------
 	//## file transfer
 	
-	case class UploadState(conversationOpt:Option[Conversation], messageJSOpt:Option[JSONValue])
-	
 	/** upload a file to be played */
 	private def upload(request:HttpServletRequest, response:HttpServletResponse) {
-		val fit		= new ServletFileUpload getItemIterator request
-		def loop(uploadState:UploadState):Tried[(HttpResponder,String),Either[UploadState,UploadState]]	=
-				uploadNextState(request, fit, uploadState) match {
-					case Win(Left(s))	=> loop(s)
-					case x				=> x
+		def stringValue(part:Part):String	=
+				new InputStreamReader(part.getInputStream(), Config.encoding.name) use { _ readFully }
+			
+		def fileNames(part:Part):Seq[String]	=
+				for {
+					header			<- (part getHeader "content-disposition").guardNotNull.toSeq
+					snip			<- header splitAround ";"
+					(name,value)	<- snip.trim splitAroundFirst '='
+					if name == "filename"
 				}
-		loop(UploadState(None,None)) match {
-			case Fail((responder,log))	=> 
-				ERROR(log)
-				responder(response)
-			case Win(Left(_))	=>
-				sys error "unexpected state"
-			case Win(Right(uploadState))	=> 	
-				uploadState.conversationOpt foreach { _.uploadBatchCompleted() }
-				Uploaded(response)
-		}
-	}
+				// TODO see http://tools.ietf.org/html/rfc2184 for non-ascii
+				yield value replaceAll ("^\"|\"$", "")
+				
+		case class Problem(message:String, exception:Option[Exception] = None)
+				
+		def handleFile(conversation:Conversation, message:JSONValue)(part:Part):Tried[(HttpResponder,Problem),Boolean]	=
+				for {
+					// TODO wrong message with multiple file names
+					fileName	<- fileNames(part).singleOption toWin (Forbidden, Problem("filename missing"))
+					 mimeType	= (part getHeader "content-type").guardNotNull flatMap MimeType.parse getOrElse unknown_unknown 
+					 size		= part.getSize
+					 // TODO files with "invalid encoding" (of their name) produce a length of 417 - don't add them!
+					 // NOTE with HTML5 this can be checked in the client by accessing the files's size which throws an exception in these cases 
+					 stream		<-
+							try { 
+								Win(part.getInputStream)
+							}
+							catch { case e:IOException	=>
+								Fail(Forbidden, Problem(s"upload stream failed for ${fileName}", Some(e)))
+							}
+					 content	= Content(mimeType, size, stream)
+					 accepted	<-
+							try {
+								Win(conversation uploadContent (message, content, fileName))
+							}
+							catch { case e:Exception =>
+								Fail(Forbidden, Problem(s"upload stream failed for ${fileName}", Some(e)))
+							}
+							finally {
+								try { stream.close() }
+								catch { case e:Exception => () }
+							}
+				}
+				yield accepted
 			
-	private def uploadNextState(request:HttpServletRequest, fit:FileItemIterator, uploadState:UploadState):Tried[(HttpResponder,String),Either[UploadState,UploadState]]	=
-			if (fit.hasNext) {
-				val	item:FileItemStream	= fit.next
-				if (item.isFormField)	uploadFormField(request, item, uploadState)
-				else					uploadFielStream(request, item, uploadState)
-			}
-			else Win(Right(uploadState))
-			
-	private def uploadFormField(request:HttpServletRequest, item:FileItemStream, uploadState:UploadState):Tried[(HttpResponder,String),Either[UploadState,UploadState]]	= {
-		val	name	= item.getFieldName
-		val stream	= item.openStream()
-		val	value	= Streams asString (stream, Config.encoding.name)
-		// DEBUG("form field " + name + " value " + value)
-		if (name == "conversation") {
-			for {
-				conversation	<- conversations use ConversationId(value) toWin (Disconnected, "unknown conversation")
-			}
-			yield {
-				// TODO ugly
-				conversation.remoteUser	= request.getRemoteUser.guardNotNull
-				Left(uploadState copy (conversationOpt	= Some(conversation)))
-			}
-		}
-		else if (name == "message") {
-			for {
-				messageJS	<- JSONMarshaller unapply value toWin (Forbidden, "invalid message")
-			}
-			yield {
-				Left(uploadState copy (messageJSOpt	= Some(messageJS)))
-			}
-		}
-		else {
-			Fail(Forbidden, "unexpected form parameter")
-		}
-	}
-	
-	private def uploadFielStream(request:HttpServletRequest, item:FileItemStream, uploadState:UploadState):Tried[(HttpResponder,String),Either[UploadState,UploadState]]	= {
-		val	name	= item.getFieldName
-		val stream	= item.openStream()
-		for {
-			conversation	<- uploadState.conversationOpt					toWin (Forbidden, "conversation missing")
-			messageJS		<- uploadState.messageJSOpt						toWin (Forbidden, "invalid message")
-			size			<- request.getContentLength guardBy { _ != -1 }	toWin (Forbidden, "upload stream was zero-sized")
-			mimeType		= item.getContentType.guardNotNull flatMap MimeType.parse getOrElse unknown_unknown
-			fileName		= item.getName
-			// TODO files with "invalid encoding" (of their name) produce a length of 417 - don't add them!
-			// NOTE with HTML5 this can be checked in the client by accessing the files's size which throws an exception in these cases 
-			// if (!Validation.uploadSize(blob.size)) {
-			// 	DEBUG("upload with invalid size swallowed")
-			// 	drain()
-			// 	return
-			// }
-			content			= Content(mimeType, size, stream)
-			accepted		<-
-					try {
-						Win(conversation uploadContent (messageJS, content, fileName))
+		val action:Tried[(HttpResponder,Problem),HttpResponder]	=
+				// NOTE these are not in the order of the request in jetty 8.1.5
+				for {
+					parts	<-
+							try {
+								Win(request.getParts.asScala.toVector)
+							}
+							catch { case e:ServletException =>  
+								Fail(Forbidden, Problem("cannot get parts", Some(e)))
+							}
+					conversationPart	<- (parts filter { _.getName == "conversation" }).singleOption	toWin (Forbidden,		Problem("multiple conversation parts encountered"))
+					conversationId		=  conversationPart |> stringValue |> ConversationId.apply
+					conversation		<- conversations use conversationId								toWin (Disconnected,	Problem("unknown conversation"))
+					messagePart			<- (parts filter { _.getName == "message" }).singleOption		toWin (Forbidden,		Problem("multiple message parts encountered"))
+					message				<- messagePart |> stringValue |> JSONMarshaller.unapply			toWin (Forbidden,		Problem("cannot parse message"))
+					outcome				<- {
+						val subActions:Seq[Tried[(HttpResponder,Problem),Boolean]]	=
+								parts filter { _.getName == "file" } map handleFile(conversation, message)
+								
+						conversation.uploadBatchCompleted()
+						
+						// TODO check
+						subActions.sequenceTried map { _ => Uploaded }
 					}
-					catch {
-						case e:Exception =>
-							Fail(Forbidden, "upload stream failed")
-					}
+				}
+				yield outcome
+				
+		action.swap map { _._2 } foreach {
+			case Problem(message, None)				=> ERROR(message)
+			case Problem(message, Some(exception))	=> ERROR(message, exception)
 		}
-		yield {
-			Left(uploadState)
-		}
+		action cata (_._1, identity) apply response
 	}
 	
 	private def download(request:HttpServletRequest, response:HttpServletResponse) {
@@ -384,8 +364,9 @@ final class RummsServlet extends HttpServlet with Logging {
 	private val UPLOADED_TEXT		= "OK"
 	private val UPGRADED_TEXT		= "VERSION"
 	
-	private val Forbidden	= SetStatus(FORBIDDEN)
-	private val NotFound	= SetStatus(NOT_FOUND)
+	private val Forbidden		= SetStatus(FORBIDDEN)
+	private val NotFound		= SetStatus(NOT_FOUND)
+	private val InternalError	= SetStatus(INTERNAL_SERVER_ERROR)
 	
 	// TODO allow caching?
 	private def ClientCode	=
