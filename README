@@ -32,8 +32,11 @@ Usage
 			</init-param>
 			<multipart-config>
 				<location>/tmp</location>
-				<max-file-size>20848820</max-file-size>
-				<max-request-size>418018841</max-request-size>
+				<!-- 128 MB -->
+				<max-file-size>134217728</max-file-size>
+				<!-- 256 MB -->
+				<max-request-size>268435456</max-request-size>
+				<!-- 1 MB -->
 				<file-size-threshold>1048576</file-size-threshold>
 			</multipart-config>
 			<async-supported>true</async-supported>
@@ -42,6 +45,9 @@ Usage
 			<servlet-name>RummsServlet</servlet-name>
 			<url-pattern>/rumms/*</url-pattern>
 		</servlet-mapping>
+
+	Note: If this servlet is reached through a filter, that filter must
+	have <async-supported>true</async-supported> set, too.
 	
 	In your server, write a controller class that 
 	-	extends the trait rumms.Controller
