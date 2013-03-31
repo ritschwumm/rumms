@@ -3,7 +3,7 @@ package rumms
 import java.io.InputStream
 
 import scutil.time._
-import scutil.log.Logging
+import scutil.log._
 
 import scjson._
 

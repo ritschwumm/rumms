@@ -12,7 +12,7 @@ import scutil.lang._
 import scutil.Implicits._
 import scutil.Resource._
 import scutil.tried._
-import scutil.log.Logging
+import scutil.log._
 
 import scjson._
 import scjson.JSONNavigation._
