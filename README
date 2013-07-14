@@ -1,76 +1,76 @@
 Bidirectional message channel between a servlet container and a browser.
 
 Facts
--	uses only a single HTTP connection
--	built on top of jetty continuations
--	messages are JSON encoded
+-   uses only a single HTTP connection
+-   built on top of jetty continuations
+-   messages are JSON encoded
 
 To build this code, get and install SBT from 
-	https://github.com/sbt/sbt
+    https://github.com/sbt/sbt
 
 Get and install these library/libraries before building:
-	https://github.com/ritschwumm/scutil
-	https://github.com/ritschwumm/scjson
-	https://github.com/ritschwumm/scwebapp
+    https://github.com/ritschwumm/scutil
+    https://github.com/ritschwumm/scjson
+    https://github.com/ritschwumm/scwebapp
 
 Use these commands to build:
-	git clone git@github.com:ritschwumm/rumms.git
-	cd rumms
-	sbt publish-local
+    git clone git@github.com:ritschwumm/rumms.git
+    cd rumms
+    sbt publish-local
 
 Usage
 
-	Add this servlet to your web.xml
-	
-		<servlet>
-			<servlet-name>RummsServlet</servlet-name>
-			<servlet-class>rumms.RummsServlet</servlet-class>
-			<load-on-startup>100</load-on-startup>
-			<init-param>
-				<param-name>controller</param-name>
-				<param-value>DemoController</param-value>
-			</init-param>
-			<multipart-config>
-				<location>/tmp</location>
-				<!-- 128 MB -->
-				<max-file-size>134217728</max-file-size>
-				<!-- 256 MB -->
-				<max-request-size>268435456</max-request-size>
-				<!-- 1 MB -->
-				<file-size-threshold>1048576</file-size-threshold>
-			</multipart-config>
-			<async-supported>true</async-supported>
-		</servlet>
-		<servlet-mapping>
-			<servlet-name>RummsServlet</servlet-name>
-			<url-pattern>/rumms/*</url-pattern>
-		</servlet-mapping>
+    Add this servlet to your web.xml
+    
+        <servlet>
+            <servlet-name>RummsServlet</servlet-name>
+            <servlet-class>rumms.RummsServlet</servlet-class>
+            <load-on-startup>100</load-on-startup>
+            <init-param>
+                <param-name>controller</param-name>
+                <param-value>DemoController</param-value>
+            </init-param>
+            <multipart-config>
+                <location>/tmp</location>
+                <!-- 128 MB -->
+                <max-file-size>134217728</max-file-size>
+                <!-- 256 MB -->
+                <max-request-size>268435456</max-request-size>
+                <!-- 1 MB -->
+                <file-size-threshold>1048576</file-size-threshold>
+            </multipart-config>
+            <async-supported>true</async-supported>
+        </servlet>
+        <servlet-mapping>
+            <servlet-name>RummsServlet</servlet-name>
+            <url-pattern>/rumms/*</url-pattern>
+        </servlet-mapping>
 
-	Note: If this servlet is reached through a filter, that filter must
-	have <async-supported>true</async-supported> set, too.
-	
-	In your server, write a controller class that 
-	-	extends the trait rumms.Controller
-	-	takes a single argument of type rumms.ControllerContext
-	-	name it demo.DemoController
-	
-		package demo
-		import rumms._
-		final class DemoController(ctx:ControllerContext) extends Controller {
-			// ...
-		}
-	
-	In the webapp, include the client code like this
-	
-		<script type="text/javascript" src="rumms/code?_="></script>
-	
-	and connect to the server like this
-	
-		var conversation = new rumms.Conversation({
-			connected:		handleConnect,
-			disconnected:	handleDisconnect,
-			upgraded:		handleUpgrade,
-			message:		handleMessage,
-			error:			handleError//,
-		});
-		conversation.connect();
+    Note: If this servlet is reached through a filter, that filter must
+    have <async-supported>true</async-supported> set, too.
+    
+    In your server, write a controller class that 
+    -   extends the trait rumms.Controller
+    -   takes a single argument of type rumms.ControllerContext
+    -   name it demo.DemoController
+    
+        package demo
+        import rumms._
+        final class DemoController(ctx:ControllerContext) extends Controller {
+            // ...
+        }
+    
+    In the webapp, include the client code like this
+    
+        <script type="text/javascript" src="rumms/code?_="></script>
+    
+    and connect to the server like this
+    
+        var conversation = new rumms.Conversation({
+            connected:      handleConnect,
+            disconnected:   handleDisconnect,
+            upgraded:       handleUpgrade,
+            message:        handleMessage,
+            error:          handleError//,
+        });
+        conversation.connect();
