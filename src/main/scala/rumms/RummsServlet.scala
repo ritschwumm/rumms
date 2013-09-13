@@ -15,6 +15,7 @@ import scutil.tried._
 import scutil.log._
 
 import scjson._
+import scjson.codec._
 import scjson.JSONNavigation._
 
 import scwebapp.MimeType
@@ -80,7 +81,7 @@ final class RummsServlet extends HttpServlet with Logging {
 			servletPrefix		+
 			"/download"			+
 			"?conversation="	+ urlEncode(receiver.idval) +
-			"&message="			+ urlEncode(JSONMarshaller apply message)
+			"&message="			+ urlEncode(encodeJSON(message))
 		}
 		def remoteUser(conversationId:ConversationId):Option[String]	=
 				conversations get conversationId flatMap { _.remoteUser }	
@@ -148,7 +149,7 @@ final class RummsServlet extends HttpServlet with Logging {
 			params.foldLeft(raw){ (raw,param) =>
 				val (key,value)	= param
 				val pattern		= "@{" + key + "}"
-				val code		= JSONMarshaller apply value
+				val code		= encodeJSON(value)
 				raw replace (pattern, code)
 			}
 	
@@ -180,7 +181,7 @@ final class RummsServlet extends HttpServlet with Logging {
 		
 		val action	=
 				for {
-					data			<- JSONMarshaller unapply dataStr	toWin (Forbidden,		"invalid message")
+					data			<- dataStr |> decodeJSON			toWin (Forbidden,		"invalid message")
 					conversationId	<- (data / "conversation").string	toWin (Forbidden,		"conversationId missing")	map ConversationId.apply
 					clientCont		<- (data / "clientCont").long		toWin (Forbidden,		"clientCont missing")
 					serverCont		<- (data / "serverCont").long		toWin (Forbidden,		"serverCont missing")
@@ -194,11 +195,11 @@ final class RummsServlet extends HttpServlet with Logging {
 					conversation handleIncoming (incoming, clientCont)
 					
 					def compileResponse(batch:Batch):String =
-							JSONMarshaller apply JSONVarObject(
+							encodeJSON(JSONVarObject(
 								"clientCont"	-> JSONNumber(clientCont),
 								"serverCont"	-> JSONNumber(batch.serverCont),
 								"messages"		-> JSONArray(batch.messages)
-							)
+							))
 						
 					// maybe there already are new messages
 					val fromConversation	= conversation fetchOutgoing serverCont
@@ -317,7 +318,7 @@ final class RummsServlet extends HttpServlet with Logging {
 					conversationId		=  conversationPart |> stringValue |> ConversationId.apply
 					conversation		<- conversations use conversationId								toWin (Disconnected,	Problem("unknown conversation"))
 					messagePart			<- (parts filter { _.getName == "message" }).singleOption		toWin (Forbidden,		Problem("multiple message parts encountered"))
-					message				<- messagePart |> stringValue |> JSONMarshaller.unapply			toWin (Forbidden,		Problem("cannot parse message"))
+					message				<- messagePart |> stringValue |> decodeJSON						toWin (Forbidden,		Problem("cannot parse message"))
 					outcome				<- {
 						val subActions:Seq[Tried[(HttpResponder,Problem),Boolean]]	=
 								parts filter { _.getName == "file" } map handleFile(conversation, message)
@@ -342,7 +343,7 @@ final class RummsServlet extends HttpServlet with Logging {
 				for {
 					conversationId	<- request	paramString "conversation"		toWin (Forbidden, 		"conversation missing") map ConversationId.apply
 					message			<- request	paramString	"message"			toWin (Forbidden, 		"message missing")
-					messageJS		<- JSONMarshaller unapply message			toWin (Forbidden, 		"invalid message")
+					messageJS		<- message |> decodeJSON					toWin (Forbidden, 		"invalid message")
 					conversation	<- conversations use conversationId			toWin (Disconnected,	"unknown conversation")
 					// TODO ugly
 					_				= { conversation.remoteUser	= request.remoteUser }
@@ -400,4 +401,13 @@ final class RummsServlet extends HttpServlet with Logging {
 			SendString(UPLOADED_TEXT)
 			
 	private val Ignore	= (_:HttpServletResponse) => ()
+	
+	//------------------------------------------------------------------------------
+	
+	private def encodeJSON(it:JSONValue):String	= 
+			JSONCodec encode it
+		
+	// TODO use the original Fail
+	private def decodeJSON(it:String):Option[JSONValue]	= 
+			JSONCodec decode it toOption;
 }
