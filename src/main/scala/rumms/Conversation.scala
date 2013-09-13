@@ -13,9 +13,9 @@ final class Conversation(val id:ConversationId, controller:Controller) extends L
 	
 	@volatile private[rumms] var remoteUser:Option[String]	= None
 	
-	@volatile private var touched:Instant	= Instant.zero
-	def alive:Boolean	= touched + Config.conversationTTL > Instant.now
-	def touch()			{ touched = Instant.now }
+	@volatile private var touched:MilliInstant	= MilliInstant.zero
+	def alive:Boolean	= touched + Config.conversationTTL > MilliInstant.now
+	def touch()			{ touched = MilliInstant.now }
 	
 	//------------------------------------------------------------------------------
 	//## client -> server
