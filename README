@@ -1,4 +1,4 @@
-Bidirectional message channel between a servlet container and a browser.
+Bidirectional message channel between a servlet container and a browser
 
 Facts
 -   uses only a single HTTP connection

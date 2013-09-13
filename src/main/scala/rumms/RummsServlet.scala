@@ -10,7 +10,7 @@ import scala.collection.JavaConverters._
 
 import scutil.lang._
 import scutil.Implicits._
-import scutil.Resource._
+import scutil.Resources._
 import scutil.tried._
 import scutil.log._
 
