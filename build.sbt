@@ -2,14 +2,14 @@ name			:= "rumms"
 
 organization	:= "de.djini"
 
-version			:= "0.31.0"
+version			:= "0.32.0"
 
-scalaVersion	:= "2.10.2"
+scalaVersion	:= "2.10.3"
 
 libraryDependencies	++= Seq(
-	"de.djini"				%%	"scutil"				% "0.27.0"	% "compile",
-	"de.djini"				%%	"scjson"				% "0.30.0"	% "compile",
-	"de.djini"				%%	"scwebapp"				% "0.24.0"	% "compile",
+	"de.djini"				%%	"scutil"				% "0.28.0"	% "compile",
+	"de.djini"				%%	"scjson"				% "0.31.0"	% "compile",
+	"de.djini"				%%	"scwebapp"				% "0.25.0"	% "compile",
 	"commons-fileupload"	%	"commons-fileupload"	% "1.3"		% "compile",
 	"javax.servlet"			%   "javax.servlet-api"		% "3.0.1"	% "provided"
 )
