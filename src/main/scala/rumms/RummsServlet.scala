@@ -263,7 +263,7 @@ final class RummsServlet extends HttpServlet with Logging {
 		def fileNames(part:Part):Seq[String]	=
 				for {
 					header			<- (part getHeader "content-disposition").guardNotNull.toSeq
-					snip			<- header splitAround ";"
+					snip			<- header splitAroundChar ';'
 					(name,value)	<- snip.trim splitAroundFirst '='
 					if name == "filename"
 				}
