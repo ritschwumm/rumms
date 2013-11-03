@@ -1,3 +1,3 @@
 package rumms
 
-case class Id(counter:Long, time:Long, random:Long)
+case class Id(machine:Long, counter:Long, time:Long, random:Long)

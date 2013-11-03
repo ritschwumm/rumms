@@ -2,7 +2,7 @@ package rumms
 
 import java.io.InputStreamReader
 import java.io.IOException
-import java.net.URLEncoder
+
 import javax.servlet._
 import javax.servlet.http._
 
@@ -23,27 +23,92 @@ import scwebapp.status._
 
 object RummsServlet {
 	private val controllerParamName	= "controller"
+	private val servletPath			= "/rumms"
 }
 
-/** delegates incoming requests to new Controller instances */
+/**
+delegates incoming requests to new Controller instances 
+mount this with an url-pattern of /rumms/STAR (where STAR is a literal "*")
+*/
 final class RummsServlet extends HttpServlet with Logging {
+	//------------------------------------------------------------------------------
+	//## handler dsl
+	
+	private type Action[T]	= Tried[(HttpResponder,Problem),T]
+	
+	private def actionLog(action:Action[Any]):Option[Seq[Any]]	=
+			action.swap.toOption map { _._2.loggable }
+		
+	private def actionResponder(action:Action[HttpResponder]):HttpResponder	=
+			action cata (_._1, identity)
+	
+	private sealed trait Problem {
+		def loggable:Seq[Any]
+	}
+	private case class PlainProblem(message:String) extends Problem {
+		def loggable:Seq[Any]	= Seq(message)
+	}
+	private case class ExceptionProblem(message:String, exception:Exception) extends Problem {
+		def loggable:Seq[Any]	= Seq(message, exception)
+	}
+	
+	private def HttpPartsProblem(it:HttpPartsProblem):Problem	=
+			it match {
+				case NotMultipart(e)		=> ExceptionProblem("not a multipart request", e)
+				case InputOutputFailed(e)	=> ExceptionProblem("io failure", e)
+				case SizeLimitExceeded(e)	=> ExceptionProblem("size limits exceeded", e)
+			}
+				
+	private implicit class ProblematicTriedParts[W](peer:Tried[HttpPartsProblem,W]) {
+		def toUse(responder:HttpResponder):Action[W]	=
+				peer withSwapped { _ map { pp:HttpPartsProblem =>
+					(responder, HttpPartsProblem(pp))
+				} }
+	} 
+	
+	private implicit class ProblematicTried[F<:Exception,W](peer:Tried[F,W]) {
+		def toUse(responder:HttpResponder, text:String):Action[W]	=
+				peer withSwapped { _ map { e => (responder, ExceptionProblem(text, e)) } }
+	} 
+	
+	private implicit class ProblematicOption[W](peer:Option[W]) {
+		def toUse(responder:HttpResponder, text:String):Action[W]	=
+				peer toWin (responder, PlainProblem(text))
+	} 
+	
+	private def triedIOException[T](block: =>T):Tried[IOException,T]	=
+			try { Win(block) }
+			catch { case e:IOException	=> Fail(e) }
+			
 	//------------------------------------------------------------------------------
 	//## life cycle
 	
-	@volatile var controller:Controller	= null
+	@volatile 
+	private var controller:Controller	= null
 	
 	override def init() {
-		val className	= getInitParameter(RummsServlet.controllerParamName)
+		INFO("initializing")
+		val className	= 
+				getServletConfig					initParamString 
+				RummsServlet.controllerParamName	getOrError 
+				"missing init parameter ${RummsServlet.controllerParamName}"
 		INFO("loading controller", className)
-		try {
-			controller	= (Class forName className getConstructor classOf[ControllerContext] newInstance controllerContext).asInstanceOf[Controller]
-			INFO("controller loaded")
-		}
-		catch { case e:Exception	=>
-			INFO("cannot load controller", e)
-			throw e
-		}
+		controller	=
+				try {
+					(
+						Class						forName 
+						className					getConstructor 
+						classOf[ControllerContext]	newInstance 
+						controllerContext
+					).asInstanceOf[Controller]
+				}
+				catch { case e:Exception	=>
+					INFO("cannot load controller", e)
+					throw e
+				}
+		INFO("controller loaded")
 	}
+	
 	override def destroy() {
 		controller.dispose()
 		controller	= null
@@ -74,15 +139,13 @@ final class RummsServlet extends HttpServlet with Logging {
 		def broadcastMessage(receiver:Predicate[ConversationId], message:JSONValue) {
 			conversations find receiver foreach { _ appendOutgoing message }
 		}
-		def downloadURL(receiver:ConversationId, message:JSONValue):String = {
-			def urlEncode(s:String):String	= URLEncoder encode (s, Config.encoding.name)
-			servletPrefix		+
-			"/download"			+
-			"?conversation="	+ urlEncode(receiver.idval) +
-			"&message="			+ urlEncode(encodeJSON(message))
-		}
+		def downloadURL(receiver:ConversationId, message:JSONValue):String =
+				servletPrefix		+
+				"/download"			+
+				"?conversation="	+ (URIComponent encode receiver.idval) +
+				"&message="			+ (message |> JSONCodec.encode |> URIComponent.encode)
 		def remoteUser(conversationId:ConversationId):Option[String]	=
-				conversations get conversationId flatMap { _.remoteUser }	
+				conversations get conversationId flatMap { _.remoteUser }
 	}
 	
 	//------------------------------------------------------------------------------
@@ -103,21 +166,23 @@ final class RummsServlet extends HttpServlet with Logging {
 		try {
 			expireConversations()
 			
+			// TODO ugly
 			request		setEncoding	Config.encoding
 			response	setEncoding	Config.encoding
 			response	noCache		()
 			
 			// TODO ugly hack
+			// NOTE context path is statically available as getServletContext.getContextPath
 			servletPrefix	= request.getContextPath + request.getServletPath
 			
 			// TODO let those return a responder
-			request.getPathInfo match {
-				case "/code"		=> code(request, response)
-				case "/hi"			=> hi(request, response)
-				case "/comm"		=> comm(request, response)
-				case "/upload"		=> upload(request, response)
-				case "/download"	=> download(request, response)
-				case _				=> NotFound(response)
+			request.pathInfoUTF8 match {
+				case Some("/code")		=> code(request, response)
+				case Some("/hi")		=> hi(request, response)
+				case Some("/comm")		=> comm(request, response)
+				case Some("/upload")	=> upload(request, response)
+				case Some("/download")	=> download(request, response)
+				case _					=> NotFound(response)
 			}
 		}
 		catch { case e:Exception => 
@@ -147,7 +212,7 @@ final class RummsServlet extends HttpServlet with Logging {
 			params.foldLeft(raw){ (raw,param) =>
 				val (key,value)	= param
 				val pattern		= "@{" + key + "}"
-				val code		= encodeJSON(value)
+				val code		= JSONCodec encode value
 				raw replace (pattern, code)
 			}
 	
@@ -175,16 +240,14 @@ final class RummsServlet extends HttpServlet with Logging {
 	
 	/** receive and send messages for a single Conversation */
 	private def comm(request:HttpServletRequest, response:HttpServletResponse) {
-		val dataStr	= request.getReader use { _.readFully }
-		
-		val action	=
+		val action:Action[HttpResponder]	=
 				for {
-					data			<- dataStr |> decodeJSON			toWin (Forbidden,		"invalid message")
-					conversationId	<- (data / "conversation").string	toWin (Forbidden,		"conversationId missing")	map ConversationId.apply
-					clientCont		<- (data / "clientCont").long		toWin (Forbidden,		"clientCont missing")
-					serverCont		<- (data / "serverCont").long		toWin (Forbidden,		"serverCont missing")
-					incoming		<- (data / "messages").arraySeq		toWin (Forbidden,		"messages missing")
-					conversation	<- conversations use conversationId	toWin (Disconnected,	"unknown conversation")
+					data			<- request.getReader use { _.readFully } into JSONCodec.decode	toUse (Forbidden,		"invalid message")
+					conversationId	<- (data / "conversation").string								toUse (Forbidden,		"conversationId missing")	map ConversationId.apply
+					clientCont		<- (data / "clientCont").long									toUse (Forbidden,		"clientCont missing")
+					serverCont		<- (data / "serverCont").long									toUse (Forbidden,		"serverCont missing")
+					incoming		<- (data / "messages").arraySeq									toUse (Forbidden,		"messages missing")
+					conversation	<- conversations use conversationId								toUse (Disconnected,	"unknown conversation")
 				}
 				yield {
 					conversation.remoteUser	= request.remoteUser
@@ -193,11 +256,11 @@ final class RummsServlet extends HttpServlet with Logging {
 					conversation handleIncoming (incoming, clientCont)
 					
 					def compileResponse(batch:Batch):String =
-							encodeJSON(JSONVarObject(
+							JSONCodec encode JSONVarObject(
 								"clientCont"	-> JSONNumber(clientCont),
 								"serverCont"	-> JSONNumber(batch.serverCont),
 								"messages"		-> JSONArray(batch.messages)
-							))
+							)
 						
 					// maybe there already are new messages
 					val fromConversation	= conversation fetchOutgoing serverCont
@@ -244,12 +307,12 @@ final class RummsServlet extends HttpServlet with Logging {
 							}
 						}
 						
-						Ignore
+						Pass
 					}
 				}
 				
-		action.swap map { _._2 } foreach (ERROR(_))
-		action cata (_._1, identity) apply response 
+		actionLog(action) foreach { ERROR(_:_*) }
+		actionResponder(action) apply response
 	}
 	
 	//------------------------------------------------------------------------------
@@ -262,7 +325,7 @@ final class RummsServlet extends HttpServlet with Logging {
 			
 		def fileNames(part:Part):Seq[String]	=
 				for {
-					header			<- (part getHeader "content-disposition").guardNotNull.toSeq
+					header			<- (part getHeader "content-disposition").guardNotNull.toVector
 					snip			<- header splitAroundChar ';'
 					(name,value)	<- snip.trim splitAroundFirst '='
 					if name == "filename"
@@ -270,56 +333,34 @@ final class RummsServlet extends HttpServlet with Logging {
 				// TODO see http://tools.ietf.org/html/rfc2184 for non-ascii
 				yield value replaceAll ("^\"|\"$", "")
 				
-		case class Problem(message:String, exception:Option[Exception] = None)
-				
-		def handleFile(conversation:Conversation, message:JSONValue)(part:Part):Tried[(HttpResponder,Problem),Boolean]	=
+		def handleFile(conversation:Conversation, message:JSONValue)(part:Part):Action[Boolean]	=
 				for {
 					// TODO wrong message with multiple file names
-					fileName	<- fileNames(part).singleOption toWin (Forbidden, Problem("filename missing"))
-					 mimeType	= (part getHeader "content-type").guardNotNull flatMap MimeType.parse getOrElse unknown_unknown 
-					 size		= part.getSize
-					 // TODO files with "invalid encoding" (of their name) produce a length of 417 - don't add them!
-					 // NOTE with HTML5 this can be checked in the client by accessing the files's size which throws an exception in these cases 
-					 stream		<-
-							try { 
-								Win(part.getInputStream)
-							}
-							catch { case e:IOException	=>
-								Fail(Forbidden, Problem(s"upload stream failed for ${fileName}", Some(e)))
-							}
-					 content	= Content(mimeType, size, stream)
-					 accepted	<-
-							try {
-								Win(conversation uploadContent (message, content, fileName))
-							}
-							catch { case e:Exception =>
-								Fail(Forbidden, Problem(s"upload stream failed for ${fileName}", Some(e)))
-							}
-							finally {
-								try { stream.close() }
-								catch { case e:Exception => () }
-							}
+					fileName	<- fileNames(part).singleOption				toUse (Forbidden, "filename missing")
+					mimeType	= (part getHeader "content-type").guardNotNull flatMap MimeType.parse getOrElse unknown_unknown 
+					size		= part.getSize
+					// TODO files with "invalid encoding" (of their name) produce a length of 417 - don't add them!
+					// NOTE with HTML5 this can be checked in the client by accessing the files's size which throws an exception in these cases 
+					stream		<- triedIOException(part.getInputStream)	toUse (Forbidden, s"upload stream failed for ${fileName}")
+					content		= Content(mimeType, size, stream)
+					// TODO ugly stream.use
+					upload		= thunk { stream use { _ => conversation uploadContent (message, content, fileName) } }
+					accepted	<- Tried catchException upload()	toUse (Forbidden, s"upload stream failed for ${fileName}")
 				}
 				yield accepted
 			
-		val action:Tried[(HttpResponder,Problem),HttpResponder]	=
+		val action:Action[HttpResponder]	=
 				// NOTE these are not in the order of the request in jetty 8.1.5
 				for {
-					parts	<-
-							try {
-								Win(request.getParts.asScala.toVector)
-							}
-							catch { case e:ServletException =>  
-								Fail(Forbidden, Problem("cannot get parts", Some(e)))
-							}
-					conversationPart	<- (parts filter { _.getName == "conversation" }).singleOption	toWin (Forbidden,		Problem("multiple conversation parts encountered"))
+					parts				<- request.parts												toUse (Forbidden)
+					conversationPart	<- (parts filter { _.getName == "conversation" }).singleOption	toUse (Forbidden,		"multiple conversation parts encountered")
 					conversationId		=  conversationPart |> stringValue |> ConversationId.apply
-					conversation		<- conversations use conversationId								toWin (Disconnected,	Problem("unknown conversation"))
-					messagePart			<- (parts filter { _.getName == "message" }).singleOption		toWin (Forbidden,		Problem("multiple message parts encountered"))
-					message				<- messagePart |> stringValue |> decodeJSON						toWin (Forbidden,		Problem("cannot parse message"))
+					conversation		<- conversations use conversationId								toUse (Disconnected,	"unknown conversation")
+					messagePart			<- (parts filter { _.getName == "message" }).singleOption		toUse (Forbidden,		"multiple message parts encountered")
+					message				<- messagePart |> stringValue |> JSONCodec.decode				toUse (Forbidden,		"cannot parse message")
 					outcome				<- {
-						val subActions:Seq[Tried[(HttpResponder,Problem),Boolean]]	=
-								parts filter { _.getName == "file" } map handleFile(conversation, message)
+						val subActions:Seq[Action[Boolean]]	=
+								parts filter { _.getName ==== "file" } map handleFile(conversation, message)
 								
 						conversation.uploadBatchCompleted()
 						
@@ -328,29 +369,26 @@ final class RummsServlet extends HttpServlet with Logging {
 					}
 				}
 				yield outcome
-				
-		action.swap map { _._2 } foreach {
-			case Problem(message, None)				=> ERROR(message)
-			case Problem(message, Some(exception))	=> ERROR(message, exception)
-		}
-		action cata (_._1, identity) apply response
+			
+		actionLog(action) foreach { ERROR(_:_*) }
+		actionResponder(action) apply response
 	}
 	
 	private def download(request:HttpServletRequest, response:HttpServletResponse) {
-		val action	=
+		val action:Action[HttpResponder]	=
 				for {
-					conversationId	<- request	paramString "conversation"		toWin (Forbidden, 		"conversation missing") map ConversationId.apply
-					message			<- request	paramString	"message"			toWin (Forbidden, 		"message missing")
-					messageJS		<- message |> decodeJSON					toWin (Forbidden, 		"invalid message")
-					conversation	<- conversations use conversationId			toWin (Disconnected,	"unknown conversation")
+					conversationId	<- request	paramString "conversation"		toUse (Forbidden, 		"conversation missing")	map ConversationId.apply
+					message			<- request	paramString	"message"			toUse (Forbidden, 		"message missing")
+					messageJS		<- JSONCodec decode message					toUse (Forbidden,		"cannot parse message")
+					conversation	<- conversations use conversationId			toUse (Disconnected,	"unknown conversation")
 					// TODO ugly
 					_				= { conversation.remoteUser	= request.remoteUser }
-					content			<- conversation downloadContent messageJS	toWin (NotFound,		"Content not found")
+					content			<- conversation downloadContent messageJS	toUse (NotFound,		"content not found")
 				}
 				yield SendContent(content)
 				
-		action.swap map { _._2 } foreach (ERROR(_))
-		action cata (_._1, identity) apply response
+		actionLog(action) foreach { ERROR(_:_*) }
+		actionResponder(action) apply response
 	}
 	
 	//------------------------------------------------------------------------------
@@ -397,15 +435,4 @@ final class RummsServlet extends HttpServlet with Logging {
 	private val Uploaded	=
 			SetContentType(text_plain_charset)	~>
 			SendString(UPLOADED_TEXT)
-			
-	private val Ignore	= (_:HttpServletResponse) => ()
-	
-	//------------------------------------------------------------------------------
-	
-	private def encodeJSON(it:JSONValue):String	= 
-			JSONCodec encode it
-		
-	// TODO use the original Fail
-	private def decodeJSON(it:String):Option[JSONValue]	= 
-			JSONCodec decode it toOption;
 }
