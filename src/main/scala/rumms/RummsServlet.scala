@@ -16,24 +16,24 @@ import scjson._
 import scjson.codec._
 import scjson.JSONNavigation._
 
-import scwebapp.MimeType
-import scwebapp.HttpResponder
-import scwebapp.HttpStatusEnum._
-import scwebapp.HttpImplicits._
-import scwebapp.HttpInstances._
-import scwebapp.StandardMimeTypes._
+import scwebapp._
+import scwebapp.implicits._
+import scwebapp.instances._
+import scwebapp.status._
+
+object RummsServlet {
+	private val controllerParamName	= "controller"
+}
 
 /** delegates incoming requests to new Controller instances */
 final class RummsServlet extends HttpServlet with Logging {
 	//------------------------------------------------------------------------------
 	//## life cycle
 	
-	private val CONTROLLER_PARAMETER	= "controller"
-	
 	@volatile var controller:Controller	= null
 	
 	override def init() {
-		val className	= getInitParameter(CONTROLLER_PARAMETER)
+		val className	= getInitParameter(RummsServlet.controllerParamName)
 		INFO("loading controller", className)
 		try {
 			controller	= (Class forName className getConstructor classOf[ControllerContext] newInstance controllerContext).asInstanceOf[Controller]
