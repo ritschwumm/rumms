@@ -1,6 +1,7 @@
 package rumms
 
 import java.io.InputStreamReader
+import java.nio.charset.Charset
 
 import javax.servlet._
 import javax.servlet.http._
@@ -22,7 +23,6 @@ import rumms.HandlerUtil._
 
 object RummsServlet {
 	private val controllerParamName	= "controller"
-	private val servletPath			= "/rumms"
 }
 
 /**
@@ -53,7 +53,7 @@ final class RummsServlet extends HttpServlet with Logging {
 					).asInstanceOf[Controller]
 				}
 				catch { case e:Exception	=>
-					INFO("cannot load controller", e)
+					ERROR("cannot load controller", e)
 					throw e
 				}
 		INFO("controller loaded")
@@ -135,7 +135,6 @@ final class RummsServlet extends HttpServlet with Logging {
 	/** send javascript code for client configuration */
 	private def code(request:HttpServletRequest):HttpResponder	= {
 		val servletPrefix	= request.getContextPath + request.getServletPath
-		// TODO calculate servlet prefix right here
 		ClientCode(clientCode(servletPrefix))
 	}
 		
@@ -154,10 +153,10 @@ final class RummsServlet extends HttpServlet with Logging {
 	
 	/** patch raw code by replacing @{id} tags */
 	private def configure(raw:String, params:Map[String,JSONValue]):String =
-			params.foldLeft(raw){ (raw,param) =>
-				val (key,value)	= param
-				val pattern		= "@{" + key + "}"
-				val code		= JSONCodec encode value
+			params.foldLeft(raw){ (raw, param) =>
+				val (key, value)	= param
+				val pattern			= "@{" + key + "}"
+				val code			= JSONCodec encode value
 				raw replace (pattern, code)
 			}
 	
@@ -190,7 +189,6 @@ final class RummsServlet extends HttpServlet with Logging {
 					conversation	<- conversations use conversationId								toUse (Disconnected,	"unknown conversation")
 				}
 				yield {
-					// TODO ugly
 					conversation.remoteUser	= request.remoteUser
 					
 					// give new messages to the client
@@ -268,7 +266,7 @@ final class RummsServlet extends HttpServlet with Logging {
 				for {
 					header			<- (part getHeader "content-disposition").guardNotNull.toVector
 					snip			<- header splitAroundChar ';'
-					(name,value)	<- snip.trim splitAroundFirst '='
+					(name, value)	<- snip.trim splitAroundFirst '='
 					if name == "filename"
 				}
 				// TODO see http://tools.ietf.org/html/rfc2184 for non-ascii
@@ -276,16 +274,15 @@ final class RummsServlet extends HttpServlet with Logging {
 				
 		def handleFile(conversation:Conversation, message:JSONValue)(part:Part):Action[Boolean]	=
 				for {
-					// TODO wrong message with multiple file names
-					fileName	<- fileNames(part).singleOption				toUse (Forbidden, "filename missing")
+					fileName	<- fileNames(part).singleOption				toUse (Forbidden, "expected exactly one filename")
 					mimeType	= (part getHeader "content-type").guardNotNull flatMap MimeType.parse getOrElse unknown_unknown 
 					size		= part.getSize
 					// TODO files with "invalid encoding" (of their name) produce a length of 417 - don't add them!
 					// NOTE with HTML5 this can be checked in the client by accessing the files's size which throws an exception in these cases 
 					stream		<- triedIOException(part.getInputStream)	toUse (Forbidden, s"upload stream failed for ${fileName}")
-					content		= Content(mimeType, size, stream)
+					content		= Content(mimeType, size, Some(fileName), stream)
 					// TODO ugly stream.use
-					upload		= thunk { stream use { _ => conversation uploadContent (message, content, fileName) } }
+					upload		= thunk { stream use { _ => conversation uploadContent (message, content) } }
 					accepted	<- Tried catchException upload()	toUse (Forbidden, s"upload stream failed for ${fileName}")
 				}
 				yield accepted
@@ -299,11 +296,14 @@ final class RummsServlet extends HttpServlet with Logging {
 					conversation		<- conversations use conversationId								toUse (Disconnected,	"unknown conversation")
 					messagePart			<- (parts filter { _.getName == "message" }).singleOption		toUse (Forbidden,		"multiple message parts encountered")
 					message				<- messagePart |> stringValue |> JSONCodec.decode				toUse (Forbidden,		"cannot parse message")
+					_					= { conversation.remoteUser	= request.remoteUser }
 					outcome				<- {
+						conversation.uploadBatchBegin()
+						
 						val subActions:Seq[Action[Boolean]]	=
 								parts filter { _.getName ==== "file" } map handleFile(conversation, message)
 								
-						conversation.uploadBatchCompleted()
+						conversation.uploadBatchEnd()
 						
 						// TODO check
 						subActions.sequenceTried map { _ => Uploaded }
@@ -322,7 +322,6 @@ final class RummsServlet extends HttpServlet with Logging {
 					message			<- request	paramString	"message"			toUse (Forbidden, 		"message missing")
 					messageJS		<- JSONCodec decode message					toUse (Forbidden,		"cannot parse message")
 					conversation	<- conversations use conversationId			toUse (Disconnected,	"unknown conversation")
-					// TODO ugly
 					_				= { conversation.remoteUser	= request.remoteUser }
 					content			<- conversation downloadContent messageJS	toUse (NotFound,		"content not found")
 				}
@@ -334,46 +333,53 @@ final class RummsServlet extends HttpServlet with Logging {
 	
 	//------------------------------------------------------------------------------
 	
-	private val text_plain_charset		= text_plain		attribute ("charset", Config.encoding.name)
-	private val text_javascript_charset	= text_javascript	attribute ("charset", Config.encoding.name)
+	private implicit class MimeTypeExt(peer:MimeType) {
+		def withCharset(charset:Charset):MimeType	=
+				peer attribute ("charset", charset.name)
+	}
 	
 	private val CONNECTED_TEXT		= "OK"
 	private val DISCONNECTED_TEXT	= "CONNECT"
 	private val UPLOADED_TEXT		= "OK"
 	private val UPGRADED_TEXT		= "VERSION"
 	
-	private val Forbidden		= SetStatus(FORBIDDEN)
-	private val NotFound		= SetStatus(NOT_FOUND)
-	private val InternalError	= SetStatus(INTERNAL_SERVER_ERROR)
+	private val Forbidden:HttpResponder		= SetStatus(FORBIDDEN)
+	private val NotFound:HttpResponder		= SetStatus(NOT_FOUND)
+	private val InternalError:HttpResponder	= SetStatus(INTERNAL_SERVER_ERROR)
 	
 	// BETTER allow caching?
-	private def ClientCode(code:String)	=
-			SetContentType(text_javascript_charset)	~>
+	private def ClientCode(code:String):HttpResponder	=
+			SetContentType(text_javascript	withCharset Config.encoding)	~>
 			SendString(code)
 	
-	private def Connected(conversationId:ConversationId)	=
-			SetContentType(text_plain_charset)	~>
-			SendString(CONNECTED_TEXT + " " + conversationId.idval)
+	private def Connected(conversationId:ConversationId):HttpResponder	=
+			SendPlainTextCharset(CONNECTED_TEXT + " " + conversationId.idval)
 			
-	private def Upgrade	=
-			SetContentType(text_plain_charset)	~>
-			SendString(UPGRADED_TEXT + " " + serverVersion)
+	private def Upgrade:HttpResponder	=
+			SendPlainTextCharset(UPGRADED_TEXT + " " + serverVersion)
 	
-	private val Disconnected	= 
-			SetContentType(text_plain_charset)	~>
-			SendString(DISCONNECTED_TEXT)
+	private val Disconnected:HttpResponder	=
+			SendPlainTextCharset(DISCONNECTED_TEXT)
 			
-	private def BatchRespose(text:String)	=
+	private def BatchRespose(text:String):HttpResponder	=
 			SetContentType(application_json)	~>
 			SendString(text)
-							
-	private def SendContent(content:Content)	=
-			SetContentType(content.mimeType)		~>
-			SetContentLength(content.contentLength)	~>
+					
+	private def SendContent(content:Content):HttpResponder	=
+			SetContentType(content.mimeType)				~>
+			SetContentLength(content.contentLength)			~>
+			(content.fileName cata (Pass, SetAttachment))	~>
 			// TODO thunk this in Content, too (???)
 			StreamFrom(thunk { content.inputStream })
 			
-	private val Uploaded	=
-			SetContentType(text_plain_charset)	~>
-			SendString(UPLOADED_TEXT)
+	// TODO validate fileName
+	private def SetAttachment(filename:String):HttpResponder	=
+			AddHeader("Content-Disposition", "attachment; filename=${filename}")
+			
+	private val Uploaded:HttpResponder	=
+			SendPlainTextCharset(UPLOADED_TEXT)
+			
+	private def SendPlainTextCharset(s:String):HttpResponder	=
+			SetContentType(text_plain withCharset Config.encoding)	~>
+			SendString(s)
 }

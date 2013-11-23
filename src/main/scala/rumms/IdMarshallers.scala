@@ -37,7 +37,7 @@ object IdMarshallers {
 							random	= (number >>   0).toLong
 						))
 					}
-					catch {
-						case e:NumberFormatException	=> None
+					catch { case e:NumberFormatException	=> 
+						None
 					})
 }

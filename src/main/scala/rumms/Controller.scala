@@ -22,10 +22,12 @@ trait Controller {
 	def receiveMessage(conversationId:ConversationId, message:JSONValue):Unit
 	
 	/** the browser uploads some data. returns false if the upload was rejected */
-	def uploadContent(conversationId:ConversationId, message:JSONValue, content:Content, fileName:String):Boolean
+	def uploadContent(conversationId:ConversationId, message:JSONValue, content:Content):Boolean
 	/** the browser wants to download some data. returns None if the download was rejected. */
 	def downloadContent(conversationId:ConversationId, message:JSONValue):Option[Content]
 	
+	/** called before a single upload request is finished, possibly followed by multiple calls to handleUpload */
+	def uploadBatchBegin(conversationId:ConversationId):Unit
 	/** called after a single upload request is finished, possibly after multiple calls to handleUpload */
-	def uploadBatchCompleted(conversationId:ConversationId):Unit
+	def uploadBatchEnd(conversationId:ConversationId):Unit
 }

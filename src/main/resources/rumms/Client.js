@@ -1,4 +1,6 @@
 var rumms	= {};
+rumms.userData	= @{USER_DATA};
+
 /*// type hint
 var ConversationContext = {
 	// a new client has connected
@@ -13,7 +15,6 @@ var ConversationContext = {
 	error:			function(object)
 };
 */
-rumms.userData	= @{USER_DATA};
 rumms.Conversation	= function(context) {
 	this.context		= context;
 	this.conversationId = null;
@@ -49,6 +50,7 @@ rumms.Conversation.prototype = {
 		this.commImmediate();
 	},
 	
+	/** add conversation and message fields, or better use downloadURL */
 	downloadBaseURL: function() {
 		return this.servletPrefix	+ "/download";
 	},
@@ -59,8 +61,13 @@ rumms.Conversation.prototype = {
 				+ "&message="		+ encodeURIComponent(JSON.stringify(message));
 	},
 	
+	/** add conversation, message and file fields */
 	uploadBaseURL: function() {
 		return this.servletPrefix + "/upload";
+	},
+	
+	canUpload: function() {
+		return !!(new XMLHttpRequest().upload && FormData);
 	},
 	
 	/*
@@ -288,6 +295,3 @@ rumms.Conversation.prototype = {
 		});
 	}//,
 };
-if (!(new XMLHttpRequest().upload) || !FormData) {
-	rumms.Conversation.prototype.upload	= null;
-}
