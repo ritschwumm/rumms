@@ -8,7 +8,7 @@ import scutil.platform.MachineId
 
 /** creates randomized, unique ids. no synchronization necessary. */
 final class IdGenerator(secure:Boolean) {
-	private val	random	= 
+	private val random	= 
 			if (secure)	SecureRandom getInstance "SHA1PRNG"
 			else		new Random
 			

@@ -41,7 +41,7 @@ final class RummsServlet extends HttpServlet with Logging {
 		val className	= 
 				getServletConfig					initParamString 
 				RummsServlet.controllerParamName	getOrError 
-				"missing init parameter ${RummsServlet.controllerParamName}"
+				s"missing init parameter ${RummsServlet.controllerParamName}"
 		INFO("loading controller", className)
 		controller	=
 				try {
