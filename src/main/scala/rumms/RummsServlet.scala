@@ -374,7 +374,7 @@ final class RummsServlet extends HttpServlet with Logging {
 			
 	// TODO validate fileName
 	private def SetAttachment(filename:String):HttpResponder	=
-			AddHeader("Content-Disposition", "attachment; filename=${filename}")
+			AddHeader("Content-Disposition", s"attachment; filename=${filename}")
 			
 	private val Uploaded:HttpResponder	=
 			SendPlainTextCharset(UPLOADED_TEXT)
