@@ -57,20 +57,38 @@ final class RummsServlet extends HttpServlet with Logging {
 					throw e
 				}
 		INFO("controller loaded")
+		
+		INFO("starting send worker")
+		sendWorker.start()
+		INFO("send worker started")
 	}
 	
 	override def destroy() {
+		INFO("destroying")
+		sendWorker.dispose()
 		controller.dispose()
 		controller	= null
+		INFO("destroyed")
 	}
+	
+	//------------------------------------------------------------------------------
+	//## send worker
+	
+	private lazy val sendWorker	=
+			new Worker(Config.sendDelay, publishConversations)
 	
 	//------------------------------------------------------------------------------
 	//## conversation management
 	
+	private val idGenerator	= new IdGenerator(Config.secureIds)
+	
+	private def nextConversationId():ConversationId	=
+			ConversationId(IdMarshallers.IdString write idGenerator.next) 
+	
 	private val conversations	= new ConversationManager
 	
 	private def createConversation(remoteUser:Option[String]):ConversationId = {
-		val	conversationId	= ConversationId.next
+		val	conversationId	= nextConversationId
 		val conversation	= new Conversation(conversationId, controller)
 		conversation.remoteUser	= remoteUser
 		conversations put conversation
@@ -82,16 +100,21 @@ final class RummsServlet extends HttpServlet with Logging {
 		conversations.expire().map { _.id } foreach controller.conversationRemoved
 	}
 	
-	private val controllerContext	= new ControllerContext {
-		def sendMessage(receiver:ConversationId, message:JSONValue) {
-			conversations get receiver foreach { _ appendOutgoing message }
-		}
-		def broadcastMessage(receiver:Predicate[ConversationId], message:JSONValue) {
-			conversations find receiver foreach { _ appendOutgoing message }
-		}
-		def remoteUser(conversationId:ConversationId):Option[String]	=
-				conversations get conversationId flatMap { _.remoteUser }
+	private def publishConversations() {
+		conversations.all foreach { _ maybePublish () }
 	}
+	
+	private val controllerContext	=
+			new ControllerContext {
+				def remoteUser(conversationId:ConversationId):Option[String]	=
+						conversations get conversationId flatMap { _.remoteUser }
+					
+				def sendMessage(receiver:ConversationId, message:JSONValue):Boolean	= {
+					(conversations get receiver)
+					.someEffect	{ _ appendOutgoing message }
+					.isDefined
+				}
+			}
 	
 	//------------------------------------------------------------------------------
 	//## request handling
@@ -108,10 +131,11 @@ final class RummsServlet extends HttpServlet with Logging {
 		try {
 			expireConversations()
 			
-			// TODO ugly
-			request		setEncoding	Config.encoding
-			response	setEncoding	Config.encoding
-			response	noCache		()
+			// TODO ugly, but changes how parameters are parsed and what getReader does
+			request	setEncoding	Config.encoding
+			// NOTE this is wrong, we set encodings in all responses anyway
+			// response	setEncoding	Config.encoding
+			response noCache		()
 			
 			plan(request)(response)
 		}
@@ -260,22 +284,12 @@ final class RummsServlet extends HttpServlet with Logging {
 	/** upload a file to be played */
 	private def upload(request:HttpServletRequest):HttpResponder	= {
 		def stringValue(part:Part):String	=
-				new InputStreamReader(part.getInputStream(), Config.encoding.name) use { _ readFully }
+				part asString Config.encoding
 			
-		def fileNames(part:Part):Seq[String]	=
-				for {
-					header			<- (part getHeader "content-disposition").guardNotNull.toVector
-					snip			<- header splitAroundChar ';'
-					(name, value)	<- snip.trim splitAroundFirst '='
-					if name == "filename"
-				}
-				// TODO see http://tools.ietf.org/html/rfc2184 for non-ascii
-				yield value replaceAll ("^\"|\"$", "")
-				
 		def handleFile(conversation:Conversation, message:JSONValue)(part:Part):Action[Boolean]	=
 				for {
-					fileName	<- fileNames(part).singleOption				toUse (Forbidden, "expected exactly one filename")
-					mimeType	= (part getHeader "content-type").guardNotNull flatMap MimeType.parse getOrElse unknown_unknown 
+					fileName	<- part.fileName.singleOption				toUse (Forbidden, "expected exactly one filename")
+					mimeType	= part headerString "Content-Type" flatMap MimeType.parse getOrElse application_octetStream
 					size		= part.getSize
 					// TODO files with "invalid encoding" (of their name) produce a length of 417 - don't add them!
 					// NOTE with HTML5 this can be checked in the client by accessing the files's size which throws an exception in these cases 
@@ -372,9 +386,8 @@ final class RummsServlet extends HttpServlet with Logging {
 			// TODO thunk this in Content, too (???)
 			StreamFrom(thunk { content.inputStream })
 			
-	// TODO validate fileName
-	private def SetAttachment(filename:String):HttpResponder	=
-			AddHeader("Content-Disposition", s"attachment; filename=${filename}")
+	private def SetAttachment(fileName:String):HttpResponder	=
+			AddHeader("Content-Disposition", s"attachment; filename=${HttpUtil quoteString fileName}")
 			
 	private val Uploaded:HttpResponder	=
 			SendPlainTextCharset(UPLOADED_TEXT)

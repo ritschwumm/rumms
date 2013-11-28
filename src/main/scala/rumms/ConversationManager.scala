@@ -6,12 +6,11 @@ import scutil.time._
 final class ConversationManager {
 	private var entries:Seq[Conversation]	= Vector.empty
 	
-	/** find Conversations whose ids match a Predicate */
-	def find(id:Predicate[ConversationId]):Iterable[Conversation]	=
-			synchronized {
-				entries filter { it => id(it.id) }
+	def all:Seq[Conversation]	=
+			synchronized { 
+				entries 
 			}
-	
+		
 	/** get a Conversation by id */
 	def get(id:ConversationId):Option[Conversation] =
 			synchronized {

@@ -103,6 +103,12 @@ rumms.Conversation.prototype = {
 		
 		xhr.open("POST", this.uploadBaseURL(), true);
 		xhr.send(form);
+		
+		return {
+			abort: function() {
+				xhr.abort();
+			}//,
+		};
 	},
 	
 	//------------------------------------------------------------------------------

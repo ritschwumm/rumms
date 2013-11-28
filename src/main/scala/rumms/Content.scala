@@ -16,4 +16,9 @@ object Content {
 			)
 }
 
-case class Content(mimeType:MimeType, contentLength:Long, fileName:Option[String], inputStream:InputStream)
+case class Content(
+	mimeType:MimeType,
+	contentLength:Long, 
+	fileName:Option[String], 
+	inputStream:InputStream
+)
