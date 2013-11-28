@@ -9,6 +9,7 @@ import javax.servlet.http._
 import scutil.lang._
 import scutil.Implicits._
 import scutil.log._
+import scutil.worker._
 
 import scjson._
 import scjson.codec._
@@ -64,8 +65,10 @@ final class RummsServlet extends HttpServlet with Logging {
 	}
 	
 	override def destroy() {
-		INFO("destroying")
+		INFO("destroying worker")
 		sendWorker.dispose()
+		sendWorker.awaitWorkless()
+		INFO("destroying controller")
 		controller.dispose()
 		controller	= null
 		INFO("destroyed")
@@ -75,7 +78,12 @@ final class RummsServlet extends HttpServlet with Logging {
 	//## send worker
 	
 	private lazy val sendWorker	=
-			new Worker(Config.sendDelay, publishConversations)
+			new Worker(
+				"conversation publisher",
+				Config.sendDelay,
+				publishConversations, 
+				e => ERROR("publishing conversations failed", e)
+			)
 	
 	//------------------------------------------------------------------------------
 	//## conversation management
