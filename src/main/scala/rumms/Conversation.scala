@@ -3,7 +3,7 @@ package rumms
 import java.io.InputStream
 
 import scutil.lang._
-import scutil.Implicits._
+import scutil.implicits._
 import scutil.time._
 import scutil.log._
 

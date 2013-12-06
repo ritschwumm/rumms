@@ -3,7 +3,7 @@ package rumms
 import java.io.IOException
 
 import scutil.lang._
-import scutil.Implicits._
+import scutil.implicits._
 
 import scwebapp._
 

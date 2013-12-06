@@ -7,7 +7,7 @@ import javax.servlet._
 import javax.servlet.http._
 
 import scutil.lang._
-import scutil.Implicits._
+import scutil.implicits._
 import scutil.log._
 import scutil.worker._
 
@@ -40,7 +40,7 @@ final class RummsServlet extends HttpServlet with Logging {
 	override def init() {
 		INFO("initializing")
 		val className	= 
-				getServletConfig					initParamString 
+				getServletConfig.initParameters		firstString 
 				RummsServlet.controllerParamName	getOrError 
 				s"missing init parameter ${RummsServlet.controllerParamName}"
 		INFO("loading controller", className)
@@ -297,7 +297,7 @@ final class RummsServlet extends HttpServlet with Logging {
 		def handleFile(conversation:Conversation, message:JSONValue)(part:Part):Action[Boolean]	=
 				for {
 					fileName	<- part.fileName.singleOption				toUse (Forbidden, "expected exactly one filename")
-					mimeType	= part headerString "Content-Type" flatMap MimeType.parse getOrElse application_octetStream
+					mimeType	= part.headers firstString "Content-Type" flatMap MimeType.parse getOrElse application_octetStream
 					size		= part.getSize
 					// TODO files with "invalid encoding" (of their name) produce a length of 417 - don't add them!
 					// NOTE with HTML5 this can be checked in the client by accessing the files's size which throws an exception in these cases 
@@ -338,10 +338,11 @@ final class RummsServlet extends HttpServlet with Logging {
 	}
 	
 	private def download(request:HttpServletRequest):HttpResponder	= {
+		val reqParams	= request.parameters
 		val action:Action[HttpResponder]	=
 				for {
-					conversationId	<- request	paramString "conversation"		toUse (Forbidden, 		"conversation missing")	map ConversationId.apply
-					message			<- request	paramString	"message"			toUse (Forbidden, 		"message missing")
+					conversationId	<- reqParams	firstString "conversation"	toUse (Forbidden, 		"conversation missing")	map ConversationId.apply
+					message			<- reqParams	firstString	"message"		toUse (Forbidden, 		"message missing")
 					messageJS		<- JSONCodec decode message					toUse (Forbidden,		"cannot parse message")
 					conversation	<- conversations use conversationId			toUse (Disconnected,	"unknown conversation")
 					_				= { conversation.remoteUser	= request.remoteUser }

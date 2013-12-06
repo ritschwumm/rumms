@@ -3,7 +3,7 @@ package rumms
 import java.nio.ByteBuffer
 
 import scutil.lang._
-import scutil.Implicits._
+import scutil.implicits._
 
 object IdMarshallers {
 	val IdBytes:Marshaller[Id,Array[Byte]]	= Marshaller(
