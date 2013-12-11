@@ -141,7 +141,7 @@ final class RummsServlet extends HttpServlet with Logging {
 			
 			// TODO ugly, but changes how parameters are parsed and what getReader does
 			request	setEncoding	Config.encoding
-			// NOTE this is wrong, we set encodings in all responses anyway
+			// NOTE this would change the content type, but we send that explicitly
 			// response	setEncoding	Config.encoding
 			response noCache		()
 			
@@ -358,7 +358,7 @@ final class RummsServlet extends HttpServlet with Logging {
 	
 	private implicit class MimeTypeExt(peer:MimeType) {
 		def withCharset(charset:Charset):MimeType	=
-				peer attribute ("charset", charset.name)
+				peer addParameter ("charset", charset.name)
 	}
 	
 	private val CONNECTED_TEXT		= "OK"
