@@ -96,10 +96,9 @@ final class RummsServlet extends HttpServlet with Logging {
 	
 	private val conversations	= new ConversationManager
 	
-	private def createConversation(remoteUser:Option[String]):ConversationId = {
+	private def createConversation():ConversationId = {
 		val	conversationId	= nextConversationId
 		val conversation	= new Conversation(conversationId, controller)
-		conversation.remoteUser	= remoteUser
 		conversations put conversation
 		controller conversationAdded conversationId
 		conversationId
@@ -115,9 +114,6 @@ final class RummsServlet extends HttpServlet with Logging {
 	
 	private val controllerContext	=
 			new ControllerContext {
-				def remoteUser(conversationId:ConversationId):Option[String]	=
-						conversations get conversationId flatMap { _.remoteUser }
-					
 				def sendMessage(receiver:ConversationId, message:JSONValue):Boolean	= {
 					(conversations get receiver)
 					.someEffect	{ _ appendOutgoing message }
@@ -205,7 +201,7 @@ final class RummsServlet extends HttpServlet with Logging {
 		val	clientVersion	= request.getReader use { _.readFully }
 		clientVersion == serverVersion cata (
 			Upgrade,
-			Connected(createConversation(request.getRemoteUser.guardNotNull))
+			Connected(createConversation())
 		)
 	}
 	
@@ -222,8 +218,6 @@ final class RummsServlet extends HttpServlet with Logging {
 					conversation	<- conversations use conversationId								toUse (Disconnected,	"unknown conversation")
 				}
 				yield {
-					conversation.remoteUser	= request.remoteUser
-					
 					// give new messages to the client
 					conversation handleIncoming (incoming, clientCont)
 					
@@ -293,12 +287,13 @@ final class RummsServlet extends HttpServlet with Logging {
 	/** upload a file to be played */
 	private def upload(request:HttpServletRequest):HttpResponder	= {
 		def stringValue(part:Part):String	=
-				part asString Config.encoding
+				part.body readString Config.encoding
 			
 		def handleFile(conversation:Conversation, message:JSONValue)(part:Part):Action[Boolean]	=
 				for {
 					fileName	<- part.fileName.singleOption						toUse (Forbidden, "expected exactly one filename")
-					mimeType	= part.headers firstString "Content-Type" flatMap MimeType.parse getOrElse application_octetStream
+					// TODO questionable
+					mimeType	= part.contentType.toOption.flatten getOrElse application_octetStream
 					size		= part.getSize
 					// TODO files with "invalid encoding" (of their name) produce a length of 417 - don't add them!
 					// NOTE with HTML5 this can be checked in the client by accessing the files's size which throws an exception in these cases 
@@ -319,7 +314,6 @@ final class RummsServlet extends HttpServlet with Logging {
 					conversation		<- conversations use conversationId								toUse (Disconnected,	"unknown conversation")
 					messagePart			<- (parts filter { _.getName == "message" }).singleOption		toUse (Forbidden,		"multiple message parts encountered")
 					message				<- messagePart |> stringValue |> JSONCodec.decode				toUse (Forbidden,		"cannot parse message")
-					_					= { conversation.remoteUser	= request.remoteUser }
 					outcome				<- {
 						conversation.uploadBatchBegin()
 						
@@ -346,7 +340,6 @@ final class RummsServlet extends HttpServlet with Logging {
 					message			<- reqParams	firstString	"message"		toUse (Forbidden, 		"message missing")
 					messageJS		<- JSONCodec decode message					toUse (Forbidden,		"cannot parse message")
 					conversation	<- conversations use conversationId			toUse (Disconnected,	"unknown conversation")
-					_				= { conversation.remoteUser	= request.remoteUser }
 					content			<- conversation downloadContent messageJS	toUse (NotFound,		"content not found")
 				}
 				yield SendContent(content)
@@ -397,7 +390,7 @@ final class RummsServlet extends HttpServlet with Logging {
 			StreamFrom(thunk { content.inputStream })
 			
 	private def SetAttachment(fileName:String):HttpResponder	=
-			AddHeader("Content-Disposition", s"attachment; filename=${HttpUtil quoteString fileName}")
+			AddHeader("Content-Disposition", s"attachment; filename=${HttpUtil quote fileName}")
 			
 	private val Uploaded:HttpResponder	=
 			SendPlainTextCharset(UPLOADED_TEXT)

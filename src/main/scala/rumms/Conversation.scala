@@ -13,10 +13,6 @@ final class Conversation(val id:ConversationId, controller:Controller) extends L
 	//------------------------------------------------------------------------------
 	//## state
 	
-	// TODO ugly
-	@volatile 
-	private[rumms] var remoteUser:Option[String]	= None
-	
 	@volatile 
 	private var touched:MilliInstant	= MilliInstant.zero
 	def alive:Boolean	= touched + Config.conversationTTL > MilliInstant.now
