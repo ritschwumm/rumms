@@ -1,5 +1,6 @@
 package rumms
 
+import java.io.IOException
 import java.io.InputStreamReader
 import java.nio.charset.Charset
 
@@ -296,16 +297,16 @@ final class RummsServlet extends HttpServlet with Logging {
 			
 		def handleFile(conversation:Conversation, message:JSONValue)(part:Part):Action[Boolean]	=
 				for {
-					fileName	<- part.fileName.singleOption				toUse (Forbidden, "expected exactly one filename")
+					fileName	<- part.fileName.singleOption						toUse (Forbidden, "expected exactly one filename")
 					mimeType	= part.headers firstString "Content-Type" flatMap MimeType.parse getOrElse application_octetStream
 					size		= part.getSize
 					// TODO files with "invalid encoding" (of their name) produce a length of 417 - don't add them!
 					// NOTE with HTML5 this can be checked in the client by accessing the files's size which throws an exception in these cases 
-					stream		<- triedIOException(part.getInputStream)	toUse (Forbidden, s"upload stream failed for ${fileName}")
+					stream		<- Catch.byType[IOException] in part.getInputStream	toUse (Forbidden, s"upload stream failed for ${fileName}")
 					content		= Content(mimeType, size, Some(fileName), stream)
 					// TODO ugly stream.use
 					upload		= thunk { stream use { _ => conversation uploadContent (message, content) } }
-					accepted	<- Tried catchException upload()	toUse (Forbidden, s"upload stream failed for ${fileName}")
+					accepted	<- Catch.exception get upload						toUse (Forbidden, s"upload stream failed for ${fileName}")
 				}
 				yield accepted
 			

@@ -47,8 +47,4 @@ private object HandlerUtil {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=
 				peer toWin (responder, PlainProblem(text))
 	} 
-	
-	def triedIOException[T](block: =>T):Tried[IOException,T]	=
-			try { Win(block) }
-			catch { case e:IOException	=> Fail(e) }
 }
