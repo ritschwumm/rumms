@@ -15,9 +15,11 @@ final class IdGenerator(secure:Boolean) {
 	private val counter:AtomicLong	= 
 			new AtomicLong(random.nextLong())
 	
-	def next():Id	= Id(
-			MachineId.long,
-			counter.incrementAndGet,
-			System.currentTimeMillis,
-			random.nextLong())
+	def next():Id	= 
+			Id(
+				MachineId.long,
+				counter.incrementAndGet,
+				System.currentTimeMillis,
+				random.nextLong()
+			)
 }

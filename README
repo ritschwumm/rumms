@@ -20,16 +20,12 @@ Use these commands to build:
 
 Usage
 
-    Add this servlet to your web.xml
+    Add this code to your web.xml
     
         <servlet>
             <servlet-name>RummsServlet</servlet-name>
             <servlet-class>rumms.RummsServlet</servlet-class>
             <load-on-startup>100</load-on-startup>
-            <init-param>
-                <param-name>controller</param-name>
-                <param-value>DemoController</param-value>
-            </init-param>
             <multipart-config>
                 <location>/tmp</location>
                 <!-- 128 MB -->
@@ -45,6 +41,13 @@ Usage
             <servlet-name>RummsServlet</servlet-name>
             <url-pattern>/rumms/*</url-pattern>
         </servlet-mapping>
+        <listener>
+            <listener-class>rumms.RummsServletContextListener</listener-class>
+        </listener>
+        <context-param>
+            <param-name>rumms-controller-factory</param-name>
+            <param-value>DemoControllerFactory</param-value>
+        </context-param>
 
     Note: If this servlet is reached through a filter, that filter must
     have <async-supported>true</async-supported> set, too.
@@ -58,6 +61,17 @@ Usage
         import rumms._
         final class DemoController(ctx:ControllerContext) extends Controller {
             // ...
+        }
+        
+    In your server, write a controller factory class that
+    -   extends the trait rumms.ControllerFactory
+    -   instantiates a DemoController
+    
+        package demo
+        import rumms._
+        final class DemoControllerFactory extends ControllerFactory {
+            def newController(ctx:ControllerContext):Controller =
+                    new DemoController(ctx)
         }
     
     In the webapp, include the client code like this

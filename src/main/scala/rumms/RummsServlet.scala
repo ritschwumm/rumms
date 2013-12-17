@@ -10,7 +10,6 @@ import javax.servlet.http._
 import scutil.lang._
 import scutil.implicits._
 import scutil.log._
-import scutil.worker._
 
 import scjson._
 import scjson.codec._
@@ -23,103 +22,27 @@ import scwebapp.status._
 
 import rumms.HandlerUtil._
 
-object RummsServlet {
-	private val controllerParamName	= "controller"
-}
-
-/**
-delegates incoming requests to new Controller instances 
-mount this with an url-pattern of /rumms/STAR (where STAR is a literal "*")
-*/
+/** mount this with an url-pattern of /rumms/STAR (where STAR is a literal "*") */
 final class RummsServlet extends HttpServlet with Logging {
 	//------------------------------------------------------------------------------
 	//## life cycle
 	
-	@volatile 
-	private var controller:Controller	= null
+	@volatile
+	private var application:RummsApplication	= null
 	
 	override def init() {
-		INFO("initializing")
-		val className	= 
-				getServletConfig.initParameters		firstString 
-				RummsServlet.controllerParamName	getOrError 
-				s"missing init parameter ${RummsServlet.controllerParamName}"
-		INFO("loading controller", className)
-		controller	=
-				try {
-					(
-						Class						forName 
-						className					getConstructor 
-						classOf[ControllerContext]	newInstance 
-						controllerContext
-					).asInstanceOf[Controller]
+		DEBUG("getting application")
+		application	=
+				(RummsServletContextListener attribute getServletContext).get getOrElse {
+					throw new ServletException("application not started, did you deploy the RummsServletContextListener?")
 				}
-				catch { case e:Exception	=>
-					ERROR("cannot load controller", e)
-					throw e
-				}
-		INFO("controller loaded")
-		
-		INFO("starting send worker")
-		sendWorker.start()
-		INFO("send worker started")
+		DEBUG("running")
 	}
-	
 	override def destroy() {
-		INFO("destroying worker")
-		sendWorker.dispose()
-		sendWorker.awaitWorkless()
-		INFO("destroying controller")
-		controller.dispose()
-		controller	= null
-		INFO("destroyed")
+		DEBUG("releasing application")
+		application	= null
+		DEBUG("stopped")
 	}
-	
-	//------------------------------------------------------------------------------
-	//## send worker
-	
-	private lazy val sendWorker	=
-			new Worker(
-				"conversation publisher",
-				Config.sendDelay,
-				publishConversations, 
-				e => ERROR("publishing conversations failed", e)
-			)
-	
-	//------------------------------------------------------------------------------
-	//## conversation management
-	
-	private val idGenerator	= new IdGenerator(Config.secureIds)
-	
-	private def nextConversationId():ConversationId	=
-			ConversationId(IdMarshallers.IdString write idGenerator.next) 
-	
-	private val conversations	= new ConversationManager
-	
-	private def createConversation():ConversationId = {
-		val	conversationId	= nextConversationId
-		val conversation	= new Conversation(conversationId, controller)
-		conversations put conversation
-		controller conversationAdded conversationId
-		conversationId
-	}
-	
-	private def expireConversations() {
-		conversations.expire().map { _.id } foreach controller.conversationRemoved
-	}
-	
-	private def publishConversations() {
-		conversations.all foreach { _ maybePublish () }
-	}
-	
-	private val controllerContext	=
-			new ControllerContext {
-				def sendMessage(receiver:ConversationId, message:JSONValue):Boolean	= {
-					(conversations get receiver)
-					.someEffect	{ _ appendOutgoing message }
-					.isDefined
-				}
-			}
 	
 	//------------------------------------------------------------------------------
 	//## request handling
@@ -134,13 +57,13 @@ final class RummsServlet extends HttpServlet with Logging {
 	
 	private def handle(request:HttpServletRequest, response:HttpServletResponse) {
 		try {
-			expireConversations()
+			application.expireConversations()
 			
 			// TODO ugly, but changes how parameters are parsed and what getReader does
 			request	setEncoding	Config.encoding
 			// NOTE this would change the content type, but we send that explicitly
 			// response	setEncoding	Config.encoding
-			response noCache		()
+			response noCache	()
 			
 			plan(request)(response)
 		}
@@ -169,14 +92,14 @@ final class RummsServlet extends HttpServlet with Logging {
 		
 	private def clientCode(servletPrefix:String):String	= {
 		val path	= "/rumms/Client.js" 
-		val stream	= getClass getResourceAsStream path nullError ("cannot access resource " + path)
+		val stream	= getClass getResourceAsStream path nullError s"cannot access resource ${path}"
 		val raw		= stream use { stream => new InputStreamReader(stream, Config.encoding.name).readFully }
 		configure(raw, Map(
-			"VERSION"			-> JSONString(serverVersion),
+			"VERSION"			-> JSONString(application.serverVersion),
 			"ENCODING"			-> JSONString(Config.encoding.name),
 			"CLIENT_TTL"		-> JSONNumber(Config.clientTTL.millis),
 			"SERVLET_PREFIX"	-> JSONString(servletPrefix),
-			"USER_DATA"			-> controller.userData
+			"USER_DATA"			-> application.userData
 		))
 	}
 	
@@ -189,33 +112,37 @@ final class RummsServlet extends HttpServlet with Logging {
 				raw replace (pattern, code)
 			}
 	
-	private def serverVersion:String	=
-			Config.version.toString + "/" + controller.version
-	
 	//------------------------------------------------------------------------------
 	//## message transfer
 	
 	/** establish a new Conversation */
 	private def hi(request:HttpServletRequest):HttpResponder	= {
 		// BETTER send JSON data here
-		val	clientVersion	= request.getReader use { _.readFully }
-		clientVersion == serverVersion cata (
-			Upgrade,
-			Connected(createConversation())
-		)
+		val action	=
+				for {
+					clientVersion	<- Catch.exception in (request.getReader use { _.readFully })	toUse (Forbidden,	"unreadable message")
+				}
+				yield clientVersion == application.serverVersion cata (
+					Upgrade,
+					Connected(application.createConversation())
+				)
+					
+		actionLog(action) foreach { ERROR(_:_*) }
+		actionResponder(action)
 	}
 	
 	/** receive and send messages for a single Conversation */
 	private def comm(request:HttpServletRequest):HttpResponder	= {
 		val action:Action[HttpResponder]	=
 				for {
-					data			<- request.getReader use { _.readFully } into JSONCodec.decode	toUse (Forbidden,		"invalid message")
+					json			<- Catch.exception in (request.getReader use { _.readFully })	toUse (Forbidden,		"unreadable message")
+					data			<- JSONCodec decode json										toUse (Forbidden,		"invalid message")
 					// TODO ugly
 					conversationId	<- (data / "conversation").string								toUse (Forbidden,		"conversationId missing")	map ConversationId.apply
 					clientCont		<- (data / "clientCont").long									toUse (Forbidden,		"clientCont missing")
 					serverCont		<- (data / "serverCont").long									toUse (Forbidden,		"serverCont missing")
 					incoming		<- (data / "messages").arraySeq									toUse (Forbidden,		"messages missing")
-					conversation	<- conversations use conversationId								toUse (Disconnected,	"unknown conversation")
+					conversation	<- application useConversation conversationId					toUse (Disconnected,	"unknown conversation")
 				}
 				yield {
 					// give new messages to the client
@@ -238,13 +165,10 @@ final class RummsServlet extends HttpServlet with Logging {
 						val asyncCtx	= request.startAsync()
 						asyncCtx setTimeout Config.continuationTTL.millis
 						
-						def sendBack() {
-							val	asyncResponse	= asyncCtx.getResponse.asInstanceOf[HttpServletResponse]
-							BatchRespose(compileResponse(conversation fetchOutgoing serverCont)) apply asyncResponse
-							asyncCtx.complete()
-						}
+						// TODO ugly
+						@volatile
+						var alive	= true
 						
-						@volatile var alive		= true
 						// all throws IOException
 						asyncCtx addListener new AsyncListener {
 							def onStartAsync(ev:AsyncEvent)	{}
@@ -253,12 +177,14 @@ final class RummsServlet extends HttpServlet with Logging {
 							}
 							def onTimeout(ev:AsyncEvent)	{ 
 								alive	= false
+								// TODO why send anything here?
 								val	asyncResponse	= asyncCtx.getResponse.asInstanceOf[HttpServletResponse]
 								BatchRespose(compileResponse(conversation fetchOutgoing serverCont)) apply asyncResponse
 								asyncCtx.complete()
 							}	
 							def onError(ev:AsyncEvent)		{
 								alive	= false
+								// TODO why send anything here?
 								val	asyncResponse	= asyncCtx.getResponse.asInstanceOf[HttpServletResponse]
 								InternalError apply asyncResponse
 								asyncCtx.complete()
@@ -312,7 +238,7 @@ final class RummsServlet extends HttpServlet with Logging {
 					parts				<- request.parts												toUse (Forbidden)
 					conversationPart	<- (parts filter { _.getName == "conversation" }).singleOption	toUse (Forbidden,		"multiple conversation parts encountered")
 					conversationId		=  conversationPart |> stringValue |> ConversationId.apply
-					conversation		<- conversations use conversationId								toUse (Disconnected,	"unknown conversation")
+					conversation		<- application useConversation conversationId					toUse (Disconnected,	"unknown conversation")
 					messagePart			<- (parts filter { _.getName == "message" }).singleOption		toUse (Forbidden,		"multiple message parts encountered")
 					message				<- messagePart |> stringValue |> JSONCodec.decode				toUse (Forbidden,		"cannot parse message")
 					outcome				<- {
@@ -335,13 +261,14 @@ final class RummsServlet extends HttpServlet with Logging {
 	
 	private def download(request:HttpServletRequest):HttpResponder	= {
 		val reqParams	= request.parameters
+		
 		val action:Action[HttpResponder]	=
 				for {
-					conversationId	<- reqParams	firstString "conversation"	toUse (Forbidden, 		"conversation missing")	map ConversationId.apply
-					message			<- reqParams	firstString	"message"		toUse (Forbidden, 		"message missing")
-					messageJS		<- JSONCodec decode message					toUse (Forbidden,		"cannot parse message")
-					conversation	<- conversations use conversationId			toUse (Disconnected,	"unknown conversation")
-					content			<- conversation downloadContent messageJS	toUse (NotFound,		"content not found")
+					conversationId	<- reqParams	firstString "conversation"		toUse (Forbidden, 		"conversation missing")	map ConversationId.apply
+					message			<- reqParams	firstString	"message"			toUse (Forbidden, 		"message missing")
+					messageJS		<- JSONCodec decode message						toUse (Forbidden,		"cannot parse message")
+					conversation	<- application useConversation conversationId	toUse (Disconnected,	"unknown conversation")
+					content			<- conversation downloadContent messageJS		toUse (NotFound,		"content not found")
 				}
 				yield SendContent(content)
 				
@@ -374,7 +301,7 @@ final class RummsServlet extends HttpServlet with Logging {
 			SendPlainTextCharset(CONNECTED_TEXT + " " + conversationId.idval)
 			
 	private def Upgrade:HttpResponder	=
-			SendPlainTextCharset(UPGRADED_TEXT + " " + serverVersion)
+			SendPlainTextCharset(UPGRADED_TEXT + " " + application.serverVersion)
 	
 	private val Disconnected:HttpResponder	=
 			SendPlainTextCharset(DISCONNECTED_TEXT)
@@ -388,6 +315,7 @@ final class RummsServlet extends HttpServlet with Logging {
 			SetContentLength(content.contentLength)			~>
 			(content.fileName cata (Pass, SetAttachment))	~>
 			// TODO thunk this in Content, too (???)
+			// TODO use a HttpOutput here directly?
 			StreamFrom(thunk { content.inputStream })
 			
 	private def SetAttachment(fileName:String):HttpResponder	=

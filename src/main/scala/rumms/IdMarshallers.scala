@@ -23,10 +23,11 @@ object IdMarshallers {
 	val IdString:Marshaller[Id,String]	= Marshaller(
 			(it:Id)	=> 
 					"%016x%016x%016x%016x" format (
-							it.machine,
-							it.counter,
-							it.time,
-							it.random),
+						it.machine,
+						it.counter,
+						it.time,
+						it.random
+					),
 			(it:String)	=>
 					try {
 						val number	= BigInt(it, 16)
