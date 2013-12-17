@@ -6,7 +6,7 @@ import scjson._
 
 trait Controller {
 	/** used for client-side version checking */
-	val version:Int
+	val version:String
 	/** available as rumms.userData in the client */
 	val userData:JSONValue
 	
