@@ -27,11 +27,16 @@ final class Conversation(val id:ConversationId, controller:Controller) extends L
 	def handleIncoming(incoming:Seq[JSONValue], clientCont:Long):Unit	=
 			// after an aborted request there may be messages in incoming already seen before
 			synchronized {
+				// TODO how can it happen that requests overtake each other?
+				if (clientCont < lastClientCont) {
+					WARN(s"clientCont: ${lastClientCont}->${clientCont}")
+					return
+				}
 				val expected	= (clientCont - lastClientCont)
 				val count		= incoming.size
 				val relevant	= incoming.size min expected.toInt
 				lastClientCont	= clientCont
-				incoming drop (count-relevant) 
+				incoming drop (count-relevant)
 			} 
 			.foreach { it => 
 				controller receiveMessage (id, it) 
