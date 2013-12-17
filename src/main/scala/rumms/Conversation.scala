@@ -46,7 +46,7 @@ final class Conversation(val id:ConversationId, controller:Controller) extends L
 			controller downloadContent	(id, message)
 		
 	def uploadContent(message:JSONValue, content:Content):Boolean	= 
-			controller uploadContent		(id, message, content)
+			controller uploadContent	(id, message, content)
 	
 	def uploadBatchBegin()	{ controller uploadBatchBegin	id }
 	def uploadBatchEnd()	{ controller uploadBatchEnd		id }
