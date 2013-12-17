@@ -287,7 +287,7 @@ final class RummsServlet extends HttpServlet with Logging {
 	/** upload a file to be played */
 	private def upload(request:HttpServletRequest):HttpResponder	= {
 		def stringValue(part:Part):String	=
-				part.body readString Config.encoding
+				(part.body encoded Config.encoding).fullString
 			
 		def handleFile(conversation:Conversation, message:JSONValue)(part:Part):Action[Boolean]	=
 				for {
