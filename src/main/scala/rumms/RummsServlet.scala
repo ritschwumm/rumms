@@ -291,7 +291,8 @@ final class RummsServlet extends HttpServlet with Logging {
 			
 		def handleFile(conversation:Conversation, message:JSONValue)(part:Part):Action[Boolean]	=
 				for {
-					fileName	<- part.fileName.singleOption						toUse (Forbidden, "expected exactly one filename")
+					fileName1	<- part.fileName									toUse  Forbidden
+					fileName	<- fileName1										toUse (Forbidden, "expected an existing filename")
 					// TODO questionable
 					mimeType	= part.contentType.toOption.flatten getOrElse application_octetStream
 					size		= part.getSize

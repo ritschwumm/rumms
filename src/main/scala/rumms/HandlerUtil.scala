@@ -38,9 +38,14 @@ private object HandlerUtil {
 				peer mapFail { pp => (responder, HttpPartsProblem(pp)) }
 	} 
 	
-	implicit class ProblematicTried[F<:Exception,W](peer:Tried[F,W]) {
+	implicit class ProblematicTriedException[F<:Exception,W](peer:Tried[F,W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=
 				peer mapFail { e => (responder, ExceptionProblem(text, e)) }
+	}
+	
+	implicit class ProblematicTriedMessage[W](peer:Tried[String,W]) {
+		def toUse(responder:HttpResponder):Action[W]	=
+				peer mapFail { e => (responder, PlainProblem(e)) }
 	} 
 	
 	implicit class ProblematicOption[W](peer:Option[W]) {
