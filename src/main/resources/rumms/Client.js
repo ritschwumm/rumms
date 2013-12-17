@@ -23,6 +23,10 @@ rumms.Conversation	= function(context) {
 	this.queue			= null;
 	this.clientCont 	= null;
 	this.serverCont 	= null;
+	
+	// non-null between push and call of commAbortFunc
+	this.commAbortTimer	= null;
+	// non-null during a client request
 	this.commAbortFunc	= null;
 };
 rumms.Conversation.prototype = {
@@ -36,6 +40,9 @@ rumms.Conversation.prototype = {
 		
 	/** delay between queue polling */
 	pollDelay:	500,
+	
+	/** delay to allow more messages to queue up */
+	abortDelay: 200,
 	
 	//------------------------------------------------------------------------------
 	//## public api
@@ -192,7 +199,10 @@ rumms.Conversation.prototype = {
 			this.commAbortFunc	= null;
 			
 			// a forced abort occurs if someone needs to send messages immediately
-			if (forcedAbort) { self.commLoop(); return; }
+			if (forcedAbort) {
+				self.commLoop();
+				return; 
+			}
 
 			try { 
 				if (client.status == 200) {
@@ -210,6 +220,9 @@ rumms.Conversation.prototype = {
 			}
 			
 		};
+		// don't interrupt, we're trying already
+		this.commUnscheduleAbort();
+		// cleared when the request has been sent
 		var timer	= setTimeout(
 			function() { client.abort(); },
 			this.clientTTL
@@ -232,9 +245,30 @@ rumms.Conversation.prototype = {
 		};
 	},
 	
+	// throttled connection aborts
 	commImmediate: function() {
-		if (!this.commAbortFunc)	return;
-		this.commAbortFunc();
+		this.commUnscheduleAbort();
+		this.commScheduleAbort();
+	},
+	
+	commUnscheduleAbort: function() {
+		if (this.commAbortTimer) {
+			clearTimeout(this.commAbortTimer);
+			this.commAbortTimer	= null;
+		}
+	},
+	
+	commScheduleAbort: function() {
+		var self	= this;
+		this.commAbortTimer	= setTimeout(
+			function() { 
+				if (self.commAbortFunc) {
+					self.commAbortFunc();
+				}
+				self.commAbortTimer	= null;
+			},
+			this.abortDelay
+		);
 	},
 		
 	commSuccess: function(text) {
@@ -286,7 +320,10 @@ rumms.Conversation.prototype = {
 	
 	commLater: function(delay) {
 		var self	= this;
-		setTimeout(function() { self.commLoop(); }, delay);
+		setTimeout(
+			function() { self.commLoop(); }, 
+			delay
+		);
 	},
 	
 	//------------------------------------------------------------------------------

@@ -6,6 +6,9 @@ import scutil.time._
 final class ConversationManager {
 	private var entries:Seq[Conversation]	= Vector.empty
 	
+	def ids:Set[ConversationId]	=
+			(all map { _.id }).toSet
+		
 	def all:Seq[Conversation]	=
 			synchronized { 
 				entries 

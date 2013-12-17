@@ -7,12 +7,14 @@ import scutil.worker._
 
 import scjson._
 
-final class RummsApplication(factory:ControllerFactory) extends Disposable with Logging {
+final class RummsApplication(factory:ControllerFactory, config:Map[String,String]) extends Disposable with Logging {
 	@volatile 
 	private var controller:Controller	= null
 	
 	private val controllerContext	=
 			new ControllerContext {
+				val configuration	= config
+				def conversationIds	= conversations.ids
 				def sendMessage(receiver:ConversationId, message:JSONValue):Boolean	=
 						(conversations get receiver)
 						.someEffect	{ _ appendOutgoing message }
