@@ -40,14 +40,8 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 				incoming drop (count-relevant)
 			} 
 			.foreach { it => 
-				callbacks receiveMessage (id, it) 
+				callbacks messageReceived (id, it) 
 			}
-	
-	def downloadContent(message:JSONValue):Option[Content]	=
-			callbacks downloadContent	(id, message)
-		
-	def uploadContents(message:JSONValue, contents:Seq[Content]):Unit	= 
-			callbacks uploadContents	(id, message, contents)
 	
 	//------------------------------------------------------------------------------
 	//## server -> client

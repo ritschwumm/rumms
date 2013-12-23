@@ -10,10 +10,7 @@ case class RummsConfiguration(
 	version:String,
 	
 	/** available as rumms.userData in the client */
-	userData:JSONValue,
-	
-	/** MultipartConfigElement */
-	upload:RummsUploadConfiguration	= RummsUploadConfiguration()
+	userData:JSONValue
 ) {
 	require(path matches "^/[a-zA-Z0-9]+$", "path must be alphanumeric chars after a slash")
 }

@@ -57,67 +57,6 @@ rumms.Conversation.prototype = {
 		this.commImmediate();
 	},
 	
-	/** add conversation and message fields, or better use downloadURL */
-	downloadBaseURL: function() {
-		return this.servletPrefix	+ "/download";
-	},
-	
-	downloadURL: function(message) {
-		return this.downloadBaseURL()
-				+ "?conversation="	+ encodeURIComponent(this.conversationId)
-				+ "&message="		+ encodeURIComponent(JSON.stringify(message));
-	},
-	
-	/** add conversation, message and file fields */
-	uploadBaseURL: function() {
-		return this.servletPrefix + "/upload";
-	},
-	
-	canUpload: function() {
-		return !!(new XMLHttpRequest().upload && FormData);
-	},
-	
-	/*
-	// type hint
-	var uploadContext	= {
-		start:		function()							{},
-		error:		function()							{},
-		abort:		function()							{},
-		load:		function()							{},
-		timeout:	function()							{},
-		progress:	function(computable, loaded, total)	{},
-		status:		function(status)					{}
-	}
-	*/
-	upload: function(file, message, context) {
-		var xhr = new XMLHttpRequest();
-		xhr.upload.addEventListener("loadstart",	function() 		{ context.start();							}, false);
-		xhr.upload.addEventListener("error",		function() 		{ context.error();							}, false);
-		xhr.upload.addEventListener("abort",		function() 		{ context.abort();							}, false);
-		xhr.upload.addEventListener("load",			function() 		{ context.load();							}, false);
-		xhr.upload.addEventListener("timeout",		function() 		{ context.timeout();						}, false);
-		xhr.upload.addEventListener("progress",		function(ev)	{ context.progress(ev.lengthComputable, ev.loaded, ev.total);	}, false);
-		xhr.onreadystatechange	= function(ev) {
-			if (xhr.readyState !== 4)	return;
-			context.status(xhr.status);
-		}
-		// TODO xhr.timeout	= 5000 // millis
-		
-		var form	= new FormData();
-		form.append("conversation",	this.conversationId);
-		form.append("message",		JSON.stringify(message));
-		form.append("file",			file,	file.name);
-		
-		xhr.open("POST", this.uploadBaseURL(), true);
-		xhr.send(form);
-		
-		return {
-			abort: function() {
-				xhr.abort();
-			}//,
-		};
-	},
-	
 	//------------------------------------------------------------------------------
 	//## private connect
 	

@@ -56,12 +56,10 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 		}
 	}
 	
-	private val plan:HttpHandler	=
-			(PathInfoUTF8("/code")		guardOn	code)		orElse
-			(PathInfoUTF8("/hi")		guardOn	hi)			orElse
-			(PathInfoUTF8("/comm")		guardOn	comm)		orElse
-			(PathInfoUTF8("/upload")	guardOn	upload)		orElse
-			(PathInfoUTF8("/download")	guardOn	download)	orAlways
+	private lazy val plan:HttpHandler	=
+			(PathInfoUTF8("/code")	guardOn	code)	orElse
+			(PathInfoUTF8("/hi")	guardOn	hi)		orElse
+			(PathInfoUTF8("/comm")	guardOn	comm)	orAlways
 			Respond(NotFound)
 	
 	//------------------------------------------------------------------------------
@@ -191,86 +189,7 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 	}
 	
 	//------------------------------------------------------------------------------
-	//## file transfer
-	
-	/** upload a file to be played */
-	private def upload(request:HttpServletRequest):HttpResponder	= {
-		def stringValue(part:Part):String	=
-				(part.body encoded Config.encoding).fullString
-			
-		def getContent(part:Part):Action[Content]	=
-				for {
-					fileName1	<- part.fileName									toUse  Forbidden
-					fileName	<- fileName1										toUse (Forbidden, "expected an existing filename")
-					// TODO files with "invalid encoding" (of their name) produce a length of 417 - don't add them!
-					// NOTE with HTML5 this can be checked in the client by accessing the files's size which throws an exception in these cases 
-				}
-				yield Content(
-					// TODO questionable
-					mimeType		= part.contentType.toOption.flatten getOrElse application_octetStream,
-					contentLength	= part.getSize,
-					// TODO questionable
-					fileName		= Some(fileName),
-					inputStream		= thunk { 
-						Catch.byType[IOException] in {
-							part.getInputStream 
-						}
-					}
-				)
-			
-		val action:Action[HttpResponder]	=
-				// NOTE these are not in the order of the request in jetty 8.1.5
-				for {
-					parts				<- request.parts												toUse (Forbidden)
-					conversationPart	<- (parts filter { _.getName == "conversation" }).singleOption	toUse (Forbidden,		"multiple conversation parts encountered")
-					conversationId		=  conversationPart |> stringValue |> ConversationId.apply
-					conversation		<- application useConversation conversationId					toUse (Disconnected,	"unknown conversation")
-					messagePart			<- (parts filter { _.getName == "message" }).singleOption		toUse (Forbidden,		"multiple message parts encountered")
-					message				<- messagePart |> stringValue |> JSONCodec.decode				toUse (Forbidden,		"cannot parse message")
-					outcome				<- {
-						val subActions:Seq[Action[Content]]	=
-								parts filter { _.getName ==== "file" } map getContent
-							
-						val contents	= 
-								subActions flatMap { _.toOption }
-							
-						try {
-							// passes valid contents only
-							conversation uploadContents (message, contents)
-						}
-						catch { case e:Exception =>
-							// TODO handle properly
-							ERROR(e)
-						}
-						
-						// TODO wrong: this should not be all-or-nothuing
-						subActions.sequenceTried map { _ => Uploaded }
-					}
-				}
-				yield outcome
-			
-		actionLog(action) foreach { ERROR(_:_*) }
-		actionResponder(action)
-	}
-	
-	private def download(request:HttpServletRequest):HttpResponder	= {
-		val reqParams	= request.parameters
-		
-		val action:Action[HttpResponder]	=
-				for {
-					conversationId	<- reqParams	firstString "conversation"		toUse (Forbidden, 		"conversation missing")	map ConversationId.apply
-					message			<- reqParams	firstString	"message"			toUse (Forbidden, 		"message missing")
-					messageJS		<- JSONCodec decode message						toUse (Forbidden,		"cannot parse message")
-					conversation	<- application useConversation conversationId	toUse (Disconnected,	"unknown conversation")
-					content			<- conversation downloadContent messageJS		toUse (NotFound,		"content not found")
-				}
-				yield SendContent(content)
-				
-		actionLog(action) foreach { ERROR(_:_*) }
-		actionResponder(action)
-	}
-	
-	//------------------------------------------------------------------------------
+	//## helper
 	
 	private implicit class MimeTypeExt(peer:MimeType) {
 		def withCharset(charset:Charset):MimeType	=
@@ -304,31 +223,6 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 			SetContentType(application_json)	~>
 			SendString(text)
 					
-	// TODO very ugly
-	private def SendContent(content:Content):HttpResponder	=
-			HttpResponder { response =>
-				content.inputStream()
-				.cata (
-					e => {
-						ERROR(e)
-						SetStatus(NOT_FOUND)
-					},
-					ist => {
-						SetContentType(content.mimeType)				~>
-						SetContentLength(content.contentLength)			~>
-						(content.fileName cata (Pass, SetAttachment))	~>
-						StreamFrom(thunk(ist))
-					}
-				)
-				.apply(response)
-			}
-			
-	private def SetAttachment(fileName:String):HttpResponder	=
-			AddHeader("Content-Disposition", s"attachment; filename=${HttpUtil quote fileName}")
-			
-	private val Uploaded:HttpResponder	=
-			SendPlainTextCharset(UPLOADED_TEXT)
-			
 	private def SendPlainTextCharset(s:String):HttpResponder	=
 			SetContentType(text_plain withCharset Config.encoding)	~>
 			SendString(s)

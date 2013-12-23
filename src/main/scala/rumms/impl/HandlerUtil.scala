@@ -26,18 +26,6 @@ private object HandlerUtil {
 		def loggable:Seq[Any]	= Seq(message, exception)
 	}
 	
-	def HttpPartsProblem(it:HttpPartsProblem):Problem	=
-			it match {
-				case NotMultipart(e)		=> ExceptionProblem("not a multipart request", e)
-				case InputOutputFailed(e)	=> ExceptionProblem("io failure", e)
-				case SizeLimitExceeded(e)	=> ExceptionProblem("size limits exceeded", e)
-			}
-				
-	implicit class ProblematicTriedParts[W](peer:Tried[HttpPartsProblem,W]) {
-		def toUse(responder:HttpResponder):Action[W]	=
-				peer mapFail { pp => (responder, HttpPartsProblem(pp)) }
-	} 
-	
 	implicit class ProblematicTriedException[F<:Exception,W](peer:Tried[F,W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=
 				peer mapFail { e => (responder, ExceptionProblem(text, e)) }

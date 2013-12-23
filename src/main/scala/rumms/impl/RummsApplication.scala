@@ -19,18 +19,10 @@ object RummsApplication {
 	def create(sc:ServletContext, configuration:RummsConfiguration):Rumms	= {
 		val application	= new RummsApplication(configuration)
 		val servlet		= new RummsServlet(application, configuration)
-		val mpconf	= 
-				new MultipartConfigElement(
-					configuration.upload.location.getPath,
-					configuration.upload.maxFileSize,
-					configuration.upload.maxRequestSize,
-					configuration.upload.fileSizeThreshold
-				)
 		val mapping	= configuration.path + "/*"
 		
 		val dynamic	= sc addServlet ("RummsServlet", servlet)
 		dynamic setLoadOnStartup	100
-		dynamic setMultipartConfig	mpconf
 		dynamic addMapping			mapping
 		dynamic setAsyncSupported	true
 		
