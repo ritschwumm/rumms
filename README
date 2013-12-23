@@ -22,58 +22,32 @@ Usage
 
     Add this code to your web.xml
     
-        <servlet>
-            <servlet-name>RummsServlet</servlet-name>
-            <servlet-class>rumms.RummsServlet</servlet-class>
-            <load-on-startup>100</load-on-startup>
-            <multipart-config>
-                <location>/tmp</location>
-                <!-- 128 MB -->
-                <max-file-size>134217728</max-file-size>
-                <!-- 256 MB -->
-                <max-request-size>268435456</max-request-size>
-                <!-- 1 MB -->
-                <file-size-threshold>1048576</file-size-threshold>
-            </multipart-config>
-            <async-supported>true</async-supported>
-        </servlet>
-        <servlet-mapping>
-            <servlet-name>RummsServlet</servlet-name>
-            <url-pattern>/rumms/*</url-pattern>
-        </servlet-mapping>
         <listener>
-            <listener-class>rumms.RummsServletContextListener</listener-class>
+            <listener-class>demo.DemoContextListener</listener-class>
         </listener>
-        <context-param>
-            <param-name>rumms-controller-factory</param-name>
-            <param-value>DemoControllerFactory</param-value>
-        </context-param>
 
     Note: If this servlet is reached through a filter, that filter must
     have <async-supported>true</async-supported> set, too.
     
-    In your server, write a controller class that 
-    -   extends the trait rumms.Controller
-    -   takes a single argument of type rumms.ControllerContext
-    -   name it demo.DemoController
+    Implement the DemoContextListener
     
         package demo
+        import javax.servlet._
         import rumms._
-        final class DemoController(ctx:ControllerContext) extends Controller {
-            // ...
+        final class DemoContextListener(sc:ServletContext) extends ServletContextListener {
+            @volatile var rumms:Option[Rumms]   = None
+            def contextInitialized(ev:ServletContextEvent) {
+                val config  = RummsConfiguration("/rumms", "0", JSONNull)
+                val rumms   = Rumms setup (ev.getServletContext, config)
+                rumms start new RummsCallbacks {
+                    // ...
+                }
+            }
+            def contextDestroyed(ev:ServletContextEvent) {
+                rumms foreach { _.dispose() }
+            }
         }
         
-    In your server, write a controller factory class that
-    -   extends the trait rumms.ControllerFactory
-    -   instantiates a DemoController
-    
-        package demo
-        import rumms._
-        final class DemoControllerFactory extends ControllerFactory {
-            def newController(ctx:ControllerContext):Controller =
-                    new DemoController(ctx)
-        }
-    
     In the webapp, include the client code like this
     
         <script type="text/javascript" src="rumms/code?_="></script>
@@ -81,10 +55,10 @@ Usage
     and connect to the server like this
     
         var conversation = new rumms.Conversation({
-            connected:      handleConnect,
-            disconnected:   handleDisconnect,
-            upgraded:       handleUpgrade,
-            message:        handleMessage,
-            error:          handleError//,
+            connected:      function(conversationId)    { ... },
+            disconnected:   function(conversationId)    { ... },
+            upgraded:       function(version)           { ... },
+            message:        function(object)            { ... },
+            error:          function(object)            { ... }//,
         });
         conversation.connect();

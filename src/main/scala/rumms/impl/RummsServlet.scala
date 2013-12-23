@@ -1,7 +1,7 @@
 package rumms
+package impl
 
-import java.io.IOException
-import java.io.InputStreamReader
+import java.io._
 import java.nio.charset.Charset
 
 import javax.servlet._
@@ -20,30 +20,13 @@ import scwebapp.implicits._
 import scwebapp.instances._
 import scwebapp.status._
 
-import rumms.HandlerUtil._
+import rumms.impl.HandlerUtil._
 
 /** mount this with an url-pattern of /rumms/STAR (where STAR is a literal "*") */
-final class RummsServlet extends HttpServlet with Logging {
-	//------------------------------------------------------------------------------
-	//## life cycle
-	
-	@volatile
-	private var application:RummsApplication	= null
-	
-	override def init() {
-		DEBUG("getting application")
-		application	=
-				(RummsServletContextListener attribute getServletContext).get getOrElse {
-					throw new ServletException("application not started, did you deploy the RummsServletContextListener?")
-				}
-		DEBUG("running")
-	}
-	override def destroy() {
-		DEBUG("releasing application")
-		application	= null
-		DEBUG("stopped")
-	}
-	
+final class RummsServlet(application:RummsApplication, configuration:RummsConfiguration) extends HttpServlet with Logging {
+	private val serverVersion	=
+			Config.version.toString + "/" + configuration.version
+		
 	//------------------------------------------------------------------------------
 	//## request handling
 	
@@ -95,11 +78,11 @@ final class RummsServlet extends HttpServlet with Logging {
 		val stream	= getClass getResourceAsStream path nullError s"cannot access resource ${path}"
 		val raw		= stream use { stream => new InputStreamReader(stream, Config.encoding.name).readFully }
 		configure(raw, Map(
-			"VERSION"			-> JSONString(application.serverVersion),
+			"VERSION"			-> JSONString(serverVersion),
 			"ENCODING"			-> JSONString(Config.encoding.name),
 			"CLIENT_TTL"		-> JSONNumber(Config.clientTTL.millis),
 			"SERVLET_PREFIX"	-> JSONString(servletPrefix),
-			"USER_DATA"			-> application.userData
+			"USER_DATA"			-> configuration.userData
 		))
 	}
 	
@@ -122,7 +105,7 @@ final class RummsServlet extends HttpServlet with Logging {
 				for {
 					clientVersion	<- Catch.exception in (request.getReader use { _.readFully })	toUse (Forbidden,	"unreadable message")
 				}
-				yield clientVersion == application.serverVersion cata (
+				yield clientVersion == serverVersion cata (
 					Upgrade,
 					Connected(application.createConversation())
 				)
@@ -215,22 +198,25 @@ final class RummsServlet extends HttpServlet with Logging {
 		def stringValue(part:Part):String	=
 				(part.body encoded Config.encoding).fullString
 			
-		def handleFile(conversation:Conversation, message:JSONValue)(part:Part):Action[Boolean]	=
+		def getContent(part:Part):Action[Content]	=
 				for {
 					fileName1	<- part.fileName									toUse  Forbidden
 					fileName	<- fileName1										toUse (Forbidden, "expected an existing filename")
-					// TODO questionable
-					mimeType	= part.contentType.toOption.flatten getOrElse application_octetStream
-					size		= part.getSize
 					// TODO files with "invalid encoding" (of their name) produce a length of 417 - don't add them!
 					// NOTE with HTML5 this can be checked in the client by accessing the files's size which throws an exception in these cases 
-					stream		<- Catch.byType[IOException] in part.getInputStream	toUse (Forbidden, s"upload stream failed for ${fileName}")
-					content		= Content(mimeType, size, Some(fileName), stream)
-					// TODO ugly stream.use
-					upload		= thunk { stream use { _ => conversation uploadContent (message, content) } }
-					accepted	<- Catch.exception get upload						toUse (Forbidden, s"upload stream failed for ${fileName}")
 				}
-				yield accepted
+				yield Content(
+					// TODO questionable
+					mimeType		= part.contentType.toOption.flatten getOrElse application_octetStream,
+					contentLength	= part.getSize,
+					// TODO questionable
+					fileName		= Some(fileName),
+					inputStream		= thunk { 
+						Catch.byType[IOException] in {
+							part.getInputStream 
+						}
+					}
+				)
 			
 		val action:Action[HttpResponder]	=
 				// NOTE these are not in the order of the request in jetty 8.1.5
@@ -242,14 +228,22 @@ final class RummsServlet extends HttpServlet with Logging {
 					messagePart			<- (parts filter { _.getName == "message" }).singleOption		toUse (Forbidden,		"multiple message parts encountered")
 					message				<- messagePart |> stringValue |> JSONCodec.decode				toUse (Forbidden,		"cannot parse message")
 					outcome				<- {
-						conversation.uploadBatchBegin()
+						val subActions:Seq[Action[Content]]	=
+								parts filter { _.getName ==== "file" } map getContent
+							
+						val contents	= 
+								subActions flatMap { _.toOption }
+							
+						try {
+							// passes valid contents only
+							conversation uploadContents (message, contents)
+						}
+						catch { case e:Exception =>
+							// TODO handle properly
+							ERROR(e)
+						}
 						
-						val subActions:Seq[Action[Boolean]]	=
-								parts filter { _.getName ==== "file" } map handleFile(conversation, message)
-								
-						conversation.uploadBatchEnd()
-						
-						// TODO check
+						// TODO wrong: this should not be all-or-nothuing
 						subActions.sequenceTried map { _ => Uploaded }
 					}
 				}
@@ -301,7 +295,7 @@ final class RummsServlet extends HttpServlet with Logging {
 			SendPlainTextCharset(CONNECTED_TEXT + " " + conversationId.idval)
 			
 	private def Upgrade:HttpResponder	=
-			SendPlainTextCharset(UPGRADED_TEXT + " " + application.serverVersion)
+			SendPlainTextCharset(UPGRADED_TEXT + " " + serverVersion)
 	
 	private val Disconnected:HttpResponder	=
 			SendPlainTextCharset(DISCONNECTED_TEXT)
@@ -310,13 +304,24 @@ final class RummsServlet extends HttpServlet with Logging {
 			SetContentType(application_json)	~>
 			SendString(text)
 					
+	// TODO very ugly
 	private def SendContent(content:Content):HttpResponder	=
-			SetContentType(content.mimeType)				~>
-			SetContentLength(content.contentLength)			~>
-			(content.fileName cata (Pass, SetAttachment))	~>
-			// TODO thunk this in Content, too (???)
-			// TODO use a HttpOutput here directly?
-			StreamFrom(thunk { content.inputStream })
+			HttpResponder { response =>
+				content.inputStream()
+				.cata (
+					e => {
+						ERROR(e)
+						SetStatus(NOT_FOUND)
+					},
+					ist => {
+						SetContentType(content.mimeType)				~>
+						SetContentLength(content.contentLength)			~>
+						(content.fileName cata (Pass, SetAttachment))	~>
+						StreamFrom(thunk(ist))
+					}
+				)
+				.apply(response)
+			}
 			
 	private def SetAttachment(fileName:String):HttpResponder	=
 			AddHeader("Content-Disposition", s"attachment; filename=${HttpUtil quote fileName}")

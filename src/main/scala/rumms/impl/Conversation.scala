@@ -1,4 +1,5 @@
 package rumms
+package impl
 
 import java.io.InputStream
 
@@ -9,7 +10,7 @@ import scutil.log._
 
 import scjson._
 
-final class Conversation(val id:ConversationId, controller:Controller) extends Logging {
+final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extends Logging {
 	//------------------------------------------------------------------------------
 	//## state
 	
@@ -39,17 +40,14 @@ final class Conversation(val id:ConversationId, controller:Controller) extends L
 				incoming drop (count-relevant)
 			} 
 			.foreach { it => 
-				controller receiveMessage (id, it) 
+				callbacks receiveMessage (id, it) 
 			}
 	
 	def downloadContent(message:JSONValue):Option[Content]	=
-			controller downloadContent	(id, message)
+			callbacks downloadContent	(id, message)
 		
-	def uploadContent(message:JSONValue, content:Content):Boolean	= 
-			controller uploadContent	(id, message, content)
-	
-	def uploadBatchBegin()	{ controller uploadBatchBegin	id }
-	def uploadBatchEnd()	{ controller uploadBatchEnd		id }
+	def uploadContents(message:JSONValue, contents:Seq[Content]):Unit	= 
+			callbacks uploadContents	(id, message, contents)
 	
 	//------------------------------------------------------------------------------
 	//## server -> client

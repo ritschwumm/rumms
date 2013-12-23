@@ -1,4 +1,5 @@
 package rumms
+package impl
 
 import scutil.lang._
 import scutil.time._

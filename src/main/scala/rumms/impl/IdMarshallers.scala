@@ -1,4 +1,4 @@
-package rumms
+package rumms.impl
 
 import java.nio.ByteBuffer
 

@@ -2,7 +2,7 @@ name			:= "rumms"
 
 organization	:= "de.djini"
 
-version			:= "0.58.0"
+version			:= "0.59.0"
 
 scalaVersion	:= "2.10.3"
 
