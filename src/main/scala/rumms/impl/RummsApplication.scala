@@ -50,11 +50,10 @@ final class RummsApplication(configuration:RummsConfiguration) extends Rumms wit
 	
 	def dispose() {
 		DEBUG("destroying sendworker")
+		
 		sendWorker.dispose()
 		sendWorker.awaitWorkless()
-		
-		// TODO ugly hack to avoid hanging threads - should properly join the sendWorker instead
-		Thread sleep (Config.sendDelay *! 2).millis
+		sendWorker.join()
 		
 		INFO("stopped")
 		this.callbacks	= null
