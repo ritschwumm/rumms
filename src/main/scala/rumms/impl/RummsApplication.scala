@@ -81,7 +81,7 @@ final class RummsApplication(configuration:RummsConfiguration) extends Rumms wit
 	private val idGenerator	= new IdGenerator(Config.secureIds)
 	
 	private def nextConversationId():ConversationId	=
-			ConversationId(IdMarshallers.IdString write idGenerator.next) 
+			ConversationId(IdPrisms.IdString read idGenerator.next) 
 	
 	private val conversations	= new ConversationManager
 	
