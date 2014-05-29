@@ -16,7 +16,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	
 	@volatile 
 	private var touched:MilliInstant	= MilliInstant.zero
-	def alive:Boolean	= touched + Config.conversationTTL > MilliInstant.now
+	def alive:Boolean	= touched +! Config.conversationTTL > MilliInstant.now
 	def touch()			{ touched = MilliInstant.now }
 	
 	//------------------------------------------------------------------------------
