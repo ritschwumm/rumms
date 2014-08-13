@@ -1,5 +1,7 @@
 package rumms.impl
 
+import scutil.lang.ISeq
+
 import scjson._
 
-case class Batch(serverCont:Long, messages:Seq[JSONValue])
+case class Batch(serverCont:Long, messages:ISeq[JSONValue])

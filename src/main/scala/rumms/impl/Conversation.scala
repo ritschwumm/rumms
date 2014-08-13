@@ -25,7 +25,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	private var lastClientCont	= 0L
 	
 	/** client -> server */
-	def handleIncoming(incoming:Seq[JSONValue], clientCont:Long):Unit	=
+	def handleIncoming(incoming:ISeq[JSONValue], clientCont:Long):Unit	=
 			// after an aborted request there may be messages in incoming already seen before
 			synchronized {
 				// TODO how can it happen that requests overtake each other?

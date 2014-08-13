@@ -5,12 +5,12 @@ import scutil.lang._
 import scutil.time._
 
 final class ConversationManager {
-	private var entries:Seq[Conversation]	= Vector.empty
+	private var entries:ISeq[Conversation]	= Vector.empty
 	
 	def ids:Set[ConversationId]	=
 			(all map { _.id }).toSet
 		
-	def all:Seq[Conversation]	=
+	def all:ISeq[Conversation]	=
 			synchronized { 
 				entries 
 			}

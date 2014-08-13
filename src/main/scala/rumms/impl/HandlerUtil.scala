@@ -10,20 +10,20 @@ import scwebapp._
 private object HandlerUtil {
 	type Action[T]	= Tried[(HttpResponder,Problem),T]
 	
-	def actionLog(action:Action[Any]):Option[Seq[Any]]	=
+	def actionLog(action:Action[Any]):Option[ISeq[Any]]	=
 			action.swap.toOption map { _._2.loggable }
 		
 	def actionResponder(action:Action[HttpResponder]):HttpResponder	=
 			action cata (_._1, identity)
 	
 	sealed trait Problem {
-		def loggable:Seq[Any]
+		def loggable:ISeq[Any]
 	}
 	case class PlainProblem(message:String) extends Problem {
-		def loggable:Seq[Any]	= Seq(message)
+		def loggable:ISeq[Any]	= ISeq(message)
 	}
 	case class ExceptionProblem(message:String, exception:Exception) extends Problem {
-		def loggable:Seq[Any]	= Seq(message, exception)
+		def loggable:ISeq[Any]	= ISeq(message, exception)
 	}
 	
 	implicit class ProblematicTriedException[F<:Exception,W](peer:Tried[F,W]) {
