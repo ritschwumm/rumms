@@ -1,7 +1,5 @@
 package rumms
 
-import java.io.InputStream
-
 import scjson._
 
 trait RummsCallbacks {

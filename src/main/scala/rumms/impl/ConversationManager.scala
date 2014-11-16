@@ -2,7 +2,6 @@ package rumms
 package impl
 
 import scutil.lang._
-import scutil.time._
 
 final class ConversationManager {
 	private var entries:ISeq[Conversation]	= Vector.empty

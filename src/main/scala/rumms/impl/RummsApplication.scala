@@ -11,9 +11,6 @@ import scutil.worker._
 
 import scjson._
 
-import scwebapp._
-import scwebapp.implicits._
-
 object RummsApplication {
 	/** must be called from a ServletContextListener.contextInitialized method */
 	def create(sc:ServletContext, configuration:RummsConfiguration):Rumms	= {
