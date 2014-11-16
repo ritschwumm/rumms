@@ -13,6 +13,8 @@ import scutil.log._
 
 import scjson._
 import scjson.codec._
+import scjson.syntax._
+import scjson.serialization._
 import scjson.JSONNavigation._
 
 import scwebapp._
@@ -96,6 +98,12 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 	//------------------------------------------------------------------------------
 	//## message transfer
 	
+	private object Protocol
+			extends	NativeProtocol
+			with	ISeqProtocol
+			with	IdentityProtocol
+	import Protocol._
+	
 	/** establish a new Conversation */
 	private def hi(request:HttpServletRequest):HttpResponder	= {
 		// BETTER send JSON data here
@@ -130,10 +138,10 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 					conversation handleIncoming (incoming, clientCont)
 					
 					def compileResponse(batch:Batch):String =
-							JSONCodec encode JSONVarObject(
-								"clientCont"	-> JSONNumber(clientCont),
-								"serverCont"	-> JSONNumber(batch.serverCont),
-								"messages"		-> JSONArray(batch.messages)
+							JSONCodec encode jsonObject(
+								"clientCont"	-> clientCont,
+								"serverCont"	-> batch.serverCont,
+								"messages"		-> batch.messages
 							)
 						
 					// maybe there already are new messages
