@@ -34,10 +34,10 @@ object IdPrisms {
 								random	= (number >>   0).toLong
 							))
 						}
-						catch { case e:NumberFormatException	=> 
+						catch { case e:NumberFormatException	=>
 							None
 						},
-				(it:Id)	=> 
+				(it:Id)	=>
 						"%016x%016x%016x%016x" format (
 							it.machine,
 							it.counter,

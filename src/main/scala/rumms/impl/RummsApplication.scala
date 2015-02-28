@@ -28,7 +28,7 @@ object RummsApplication {
 }
 
 final class RummsApplication(configuration:RummsConfiguration) extends Rumms with Disposable with Logging { outer =>
-	@volatile 
+	@volatile
 	private var callbacks:RummsCallbacks	= null
 	
 	//------------------------------------------------------------------------------
@@ -63,7 +63,7 @@ final class RummsApplication(configuration:RummsConfiguration) extends Rumms wit
 			new Worker(
 				"conversation publisher",
 				Config.sendDelay,
-				publishConversations, 
+				publishConversations,
 				e => ERROR("publishing conversations failed", e)
 			)
 			
@@ -78,7 +78,7 @@ final class RummsApplication(configuration:RummsConfiguration) extends Rumms wit
 	private val idGenerator	= new IdGenerator(Config.secureIds)
 	
 	private def nextConversationId():ConversationId	=
-			ConversationId(IdPrisms.IdString read idGenerator.next) 
+			ConversationId(IdPrisms.IdString read idGenerator.next)
 	
 	private val conversations	= new ConversationManager
 	

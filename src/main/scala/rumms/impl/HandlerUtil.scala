@@ -34,10 +34,10 @@ private object HandlerUtil {
 	implicit class ProblematicTriedMessage[W](peer:Tried[String,W]) {
 		def toUse(responder:HttpResponder):Action[W]	=
 				peer mapFail { e => (responder, PlainProblem(e)) }
-	} 
+	}
 	
 	implicit class ProblematicOption[W](peer:Option[W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=
 				peer toWin (responder, PlainProblem(text))
-	} 
+	}
 }

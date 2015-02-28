@@ -14,7 +14,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	//------------------------------------------------------------------------------
 	//## state
 	
-	@volatile 
+	@volatile
 	private var touched:MilliInstant	= MilliInstant.zero
 	def alive:Boolean	= touched +! Config.conversationTTL > MilliInstant.now
 	def touch()			{ touched = MilliInstant.now }
@@ -38,9 +38,9 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 				val relevant	= incoming.size min expected.toInt
 				lastClientCont	= clientCont
 				incoming drop (count-relevant)
-			} 
-			.foreach { it => 
-				callbacks messageReceived (id, it) 
+			}
+			.foreach { it =>
+				callbacks messageReceived (id, it)
 			}
 	
 	//------------------------------------------------------------------------------
@@ -67,7 +67,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 				// val out	= publishers
 				// publishers	= None
 				// out
-			} 
+			}
 			// .foreach { it =>
 			// 	try { it() }
 			// 	catch { case e:Exception => ERROR(e) }
@@ -75,7 +75,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	
 	/** called when the browser wants to receive some messages */
 	def fetchOutgoing(serverCont:Long):Batch =
-			synchronized { 
+			synchronized {
 				entries	= entries.filter { _.id >= serverCont }
 				val	messages	= entries.reverse map { _.message }
 				Batch(nextId, messages)

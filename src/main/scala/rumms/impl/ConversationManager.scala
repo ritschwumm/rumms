@@ -10,8 +10,8 @@ final class ConversationManager {
 			(all map { _.id }).toSet
 		
 	def all:ISeq[Conversation]	=
-			synchronized { 
-				entries 
+			synchronized {
+				entries
 			}
 		
 	/** get a Conversation by id */

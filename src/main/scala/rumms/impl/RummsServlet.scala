@@ -52,7 +52,7 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 			
 			plan(request)(response)
 		}
-		catch { case e:Exception => 
+		catch { case e:Exception =>
 			ERROR(e)
 			throw e
 		}
@@ -74,7 +74,7 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 	}
 		
 	private def clientCode(servletPrefix:String):String	= {
-		val path	= "/rumms/Client.js" 
+		val path	= "/rumms/Client.js"
 		val stream	= getClass getResourceAsStream path nullError s"cannot access resource ${path}"
 		val raw		= stream use { stream => new InputStreamReader(stream, Config.encoding.name).readFully }
 		configure(raw, Map(
@@ -161,10 +161,10 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 						// all throws IOException
 						asyncCtx addListener new AsyncListener {
 							def onStartAsync(ev:AsyncEvent)	{}
-							def onComplete(ev:AsyncEvent)	{ 
+							def onComplete(ev:AsyncEvent)	{
 								alive	= false	
 							}
-							def onTimeout(ev:AsyncEvent)	{ 
+							def onTimeout(ev:AsyncEvent)	{
 								alive	= false
 								// TODO why send anything here?
 								val	asyncResponse	= asyncCtx.getResponse.asInstanceOf[HttpServletResponse]
