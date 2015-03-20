@@ -24,8 +24,18 @@ import scwebapp.status._
 
 import rumms.impl.HandlerUtil._
 
+object RummsServlet {
+	object paths {
+		val code	= "/code"
+		val hi		= "/hi"
+		val comm	= "/comm"
+	}
+}
+
 /** mount this with an url-pattern of /rumms/STAR (where STAR is a literal "*") */
 final class RummsServlet(application:RummsApplication, configuration:RummsConfiguration) extends HttpServlet with Logging {
+	import RummsServlet.paths
+	
 	private val serverVersion	=
 			Config.version.toString + "/" + configuration.version
 		
@@ -59,9 +69,9 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 	}
 	
 	private lazy val plan:HttpHandler	=
-			(PathInfoUTF8("/code")	guardOn	code)	orElse
-			(PathInfoUTF8("/hi")	guardOn	hi)		orElse
-			(PathInfoUTF8("/comm")	guardOn	comm)	orAlways
+			(PathInfoUTF8(paths.code)	guardOn	code)	orElse
+			(PathInfoUTF8(paths.hi)		guardOn	hi)		orElse
+			(PathInfoUTF8(paths.comm)	guardOn	comm)	orAlways
 			Respond(NotFound)
 	
 	//------------------------------------------------------------------------------
@@ -74,9 +84,9 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 	}
 		
 	private def clientCode(servletPrefix:String):String	= {
-		val path	= "/rumms/Client.js"
-		val stream	= getClass getResourceAsStream path nullError s"cannot access resource ${path}"
-		val raw		= stream use { stream => new InputStreamReader(stream, Config.encoding.name).readFully }
+		val resource	= "/rumms/Client.js"
+		val stream		= getClass getResourceAsStream resource nullError s"cannot access resource ${resource}"
+		val raw			= stream use { stream => new InputStreamReader(stream, Config.encoding.name).readFully }
 		configure(raw, Map(
 			"VERSION"			-> JSONString(serverVersion),
 			"ENCODING"			-> JSONString(Config.encoding.name),

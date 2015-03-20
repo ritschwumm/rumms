@@ -23,4 +23,7 @@ trait Rumms extends Disposable {
 	
 	/** send a message to a Conversation, returns success */
 	def sendMessage(receiver:ConversationId, message:JSONValue):Boolean
+	
+	/** relative to the webapp's context */
+	def codePath:String
 }

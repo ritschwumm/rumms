@@ -31,6 +31,8 @@ final class RummsApplication(configuration:RummsConfiguration) extends Rumms wit
 	@volatile
 	private var callbacks:RummsCallbacks	= null
 	
+	val codePath:String	= (configuration.path substring 1) + RummsServlet.paths.code + "?_="
+	
 	//------------------------------------------------------------------------------
 	//## life cycle
 	

@@ -5,7 +5,7 @@ Facts
 -   built on top of jetty continuations
 -   messages are JSON encoded
 
-To build this code, get and install SBT from 
+To build this code, get and install SBT from
     https://github.com/sbt/sbt
 
 Get and install these library/libraries before building:
@@ -21,16 +21,16 @@ Use these commands to build:
 Usage
 
     Add this code to your web.xml
-    
+
         <listener>
             <listener-class>demo.DemoContextListener</listener-class>
         </listener>
 
     Note: If this servlet is reached through a filter, that filter must
     have <async-supported>true</async-supported> set, too.
-    
+
     Implement the DemoContextListener
-    
+
         package demo
         import javax.servlet._
         import rumms._
@@ -47,13 +47,13 @@ Usage
                 rumms foreach { _.dispose() }
             }
         }
-        
+
     In the webapp, include the client code like this
-    
+
         <script type="text/javascript" src="rumms/code?_="></script>
-    
+
     and connect to the server like this
-    
+
         var conversation = new rumms.Conversation({
             connected:      function(conversationId)    { ... },
             disconnected:   function(conversationId)    { ... },
