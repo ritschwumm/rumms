@@ -156,7 +156,8 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 						
 					// maybe there already are new messages
 					val fromConversation	= conversation fetchOutgoing serverCont
-					if (fromConversation.messages.nonEmpty) {
+					// incoming messages should not block the receiver
+					if (fromConversation.messages.nonEmpty || incoming.nonEmpty) {
 						// DEBUG("sending available data immediately", continuation)
 						BatchRespose(compileResponse(fromConversation))
 					}

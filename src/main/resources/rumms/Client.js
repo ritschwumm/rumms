@@ -39,7 +39,7 @@ rumms.Conversation.prototype = {
 	errorDelay:	10000,
 		
 	/** delay between queue polling */
-	pollDelay:	500,
+	pollDelay:	100,
 	
 	/** delay to allow more messages to queue up */
 	abortDelay: 200,
@@ -62,13 +62,14 @@ rumms.Conversation.prototype = {
 	
 	hiLoop: function() {
 		var self	= this;
+		
 		var	client	= new XMLHttpRequest();
 		client.open("POST", this.servletPrefix + "/hi?_=", true);
 		client.onreadystatechange = function() {
 			if (client.readyState !== 4)	return;
 			clearTimeout(timer);
-			try { 
-				if (client.status == 200) {
+			try {
+				if (client.status === 200) {
 					self.hiSuccess(client.responseText);
 				}
 				else {
@@ -76,13 +77,16 @@ rumms.Conversation.prototype = {
 					self.hiError();
 				}
 			}
-			catch (e) { 
+			catch (e) {
 				self.notifyError("hi", "cannot get client status", e);
-				self.hiError(); 
+				self.hiError();
 			}
 		};
+		
+		// protect against requests hanging for a long time
+		// cleared when the request has been sent
 		var timer	= setTimeout(
-			function() { client.abort(); }, 
+			function() { client.abort(); },
 			this.clientTTL
 		);
 		client.send(this.version);
@@ -129,6 +133,7 @@ rumms.Conversation.prototype = {
 		if (!this.connected)	return;
 		
 		var self	= this;
+		
 		var	client	= new XMLHttpRequest();
 		client.open("POST", this.servletPrefix + "/comm?_=", true);
 		client.onreadystatechange = function() {
@@ -140,11 +145,11 @@ rumms.Conversation.prototype = {
 			// a forced abort occurs if someone needs to send messages immediately
 			if (forcedAbort) {
 				self.commLoop();
-				return; 
+				return;
 			}
 
-			try { 
-				if (client.status == 200) {
+			try {
+				if (client.status === 200) {
 					self.commSuccess(client.responseText);
 				}
 				else {
@@ -152,20 +157,24 @@ rumms.Conversation.prototype = {
 					self.commError();
 				}
 			}
-			catch (e) { 
+			catch (e) {
 				self.notifyError("comm", "cannot get client status", e);
-				self.commError(); 
-				return; 
+				self.commError();
+				return;
 			}
-			
 		};
+		
 		// don't interrupt, we're trying already
 		this.commUnscheduleAbort();
+		
+		// protect against requests hanging for a long time
 		// cleared when the request has been sent
 		var timer	= setTimeout(
 			function() { client.abort(); },
 			this.clientTTL
 		);
+		// TODO limit how much is sent in one go?
+		var outgoing	= this.queue.map(function(it) { return it.message; });
 		client.send(JSON.stringify({
 			"conversation": this.conversationId,
 			// which messages have been sent to the server with this request
@@ -173,15 +182,19 @@ rumms.Conversation.prototype = {
 			// which messages the server told me will be next
 			"serverCont":	this.serverCont,
 			// new messages go to the server
-			"messages":		this.queue.map(function(it) { return it.message; })//,
+			"messages":		outgoing//,
 		}));
 		
 		// enable forced aborts when messages should be sent immediately
 		var forcedAbort	= false;
-		this.commAbortFunc	= function() { 
-			forcedAbort	= true;
-			client.abort(); 
-		};
+		// sending messages may take quite some time, so we shouldn't interrupt that.
+		// the server will not block when we sent new messages anyway.
+		if (outgoing.length === 0) {
+			this.commAbortFunc	= function() {
+				forcedAbort	= true;
+				client.abort();
+			};
+		}
 	},
 	
 	// throttled connection aborts
@@ -190,17 +203,10 @@ rumms.Conversation.prototype = {
 		this.commScheduleAbort();
 	},
 	
-	commUnscheduleAbort: function() {
-		if (this.commAbortTimer) {
-			clearTimeout(this.commAbortTimer);
-			this.commAbortTimer	= null;
-		}
-	},
-	
 	commScheduleAbort: function() {
 		var self	= this;
 		this.commAbortTimer	= setTimeout(
-			function() { 
+			function() {
 				if (self.commAbortFunc) {
 					self.commAbortFunc();
 				}
@@ -209,17 +215,24 @@ rumms.Conversation.prototype = {
 			this.abortDelay
 		);
 	},
+	
+	commUnscheduleAbort: function() {
+		if (this.commAbortTimer) {
+			clearTimeout(this.commAbortTimer);
+			this.commAbortTimer	= null;
+		}
+	},
 		
 	commSuccess: function(text) {
 		// HACK for "messages has no properties" failure
-		if (text == "") {
+		if (text === "") {
 			this.notifyError("comm", "empty response");
 			this.commLater(this.errorDelay);
 			return;
 		}
 		
 		// the server did not recognize our conversation id
-		if (text == "CONNECT") {
+		if (text === "CONNECT") {
 			this.connected	= false;
 			this.context.disconnected(this.conversationId);
 			return;
@@ -260,7 +273,7 @@ rumms.Conversation.prototype = {
 	commLater: function(delay) {
 		var self	= this;
 		setTimeout(
-			function() { self.commLoop(); }, 
+			function() { self.commLoop(); },
 			delay
 		);
 	},
