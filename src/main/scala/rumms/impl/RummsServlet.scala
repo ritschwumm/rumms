@@ -144,6 +144,9 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 					conversation	<- application useConversation conversationId					toUse (Disconnected,	"unknown conversation")
 				}
 				yield {
+					// tell the client it's alive
+					conversation.handleHeartbeat()
+					
 					// give new messages to the client
 					conversation handleIncoming (incoming, clientCont)
 					

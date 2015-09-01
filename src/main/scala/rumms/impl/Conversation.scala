@@ -24,6 +24,9 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	
 	private var lastClientCont	= 0L
 	
+	def handleHeartbeat():Unit	=
+			callbacks conversationAlive id
+	
 	/** client -> server */
 	def handleIncoming(incoming:ISeq[JSONValue], clientCont:Long):Unit	=
 			// after an aborted request there may be messages in incoming already seen before
