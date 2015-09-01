@@ -11,6 +11,8 @@ var ConversationContext = {
 	upgraded:		function(version)
 	// the server sent a message
 	message:		function(object)
+	// the connection is alive
+	heartbeat:	function()
 	// the connection failed
 	error:			function(object)
 };
@@ -73,7 +75,7 @@ rumms.Conversation.prototype = {
 					self.hiSuccess(client.responseText);
 				}
 				else {
-					self.notifyError("hi", "expected status 200");
+					self.notifyError("hi", "expected status 200, not " + client.status);
 					self.hiError();
 				}
 			}
@@ -153,7 +155,7 @@ rumms.Conversation.prototype = {
 					self.commSuccess(client.responseText);
 				}
 				else {
-					self.notifyError("comm", "expected status 200");
+					self.notifyError("comm", "expected status 200, not " + client.status);
 					self.commError();
 				}
 			}
@@ -238,6 +240,14 @@ rumms.Conversation.prototype = {
 			return;
 		}
 		
+		try {
+			this.context.heartbeat();
+		}
+		catch (e) {
+			this.notifyError("comm", "exception in heartbeat handler", e);
+			this.commLater(this.errorDelay);
+		}
+			
 		try {
 			var data	= JSON.parse(text);
 			

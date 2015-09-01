@@ -16,13 +16,11 @@ object RummsApplication {
 	def create(sc:ServletContext, configuration:RummsConfiguration):Rumms	= {
 		val application	= new RummsApplication(configuration)
 		val servlet		= new RummsServlet(application, configuration)
-		val mapping	= configuration.path + "/*"
-		
-		val dynamic	= sc addServlet ("RummsServlet", servlet)
+		val mapping		= configuration.path + "/*"
+		val dynamic		= sc addServlet ("RummsServlet", servlet)
 		dynamic setLoadOnStartup	100
 		dynamic addMapping			mapping
 		dynamic setAsyncSupported	true
-		
 		application
 	}
 }
