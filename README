@@ -59,6 +59,7 @@ Usage
             disconnected:   function(conversationId)    { ... },
             upgraded:       function(version)           { ... },
             message:        function(object)            { ... },
+            heartbeat:      function()                  { ... },
             error:          function(object)            { ... }//,
         });
         conversation.connect();
