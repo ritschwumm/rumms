@@ -11,5 +11,5 @@ object Config {
 	val clientTTL		= continuationTTL	*! 2
 	val conversationTTL	= clientTTL			*! 3
 	val sendDelay		= 100.millis
-	val secureIds		= false
+	val secureIds		= true
 }
