@@ -4,11 +4,12 @@ package impl
 import javax.servlet.ServletContext
 import javax.servlet.MultipartConfigElement
 
-import scutil.lang._
+//import scutil.lang._
 import scutil.implicits._
 import scutil.log._
 import scutil.worker._
 
+import scwebapp.HttpHandler
 import scwebapp.HttpHandlerServlet
 
 import scjson._
@@ -17,22 +18,36 @@ object RummsApplication {
 	/** must be called from a ServletContextListener.contextInitialized method */
 	def create(sc:ServletContext, configuration:RummsConfiguration):Rumms	= {
 		val application	= new RummsApplication(configuration)
-		val handler		= new RummsHandler(application, configuration)
-		val servlet		= new HttpHandlerServlet(handler.plan)
+		val servlet		= new HttpHandlerServlet(application.httpHandler)
 		val mapping		= configuration.path + "/*"
 		val dynamic		= sc addServlet ("RummsServlet", servlet)
 		dynamic setLoadOnStartup	100
 		dynamic addMapping			mapping
 		dynamic setAsyncSupported	true
-		application
+		application.userInterface
 	}
 }
 
-final class RummsApplication(configuration:RummsConfiguration) extends Rumms with Disposable with Logging { outer =>
+final class RummsApplication(configuration:RummsConfiguration) extends Logging { outer =>
 	@volatile
 	private var callbacks:RummsCallbacks	= null
 	
-	val codePath:String	= (configuration.path substring 1) + RummsHandler.paths.code + "?_="
+	def httpHandler:HttpHandler	= rummsHandler.plan
+	private def rummsHandler	= new RummsHandler(this, configuration)
+	
+	private val codePath:String	= (configuration.path substring 1) + Constants.paths.code + "?_="
+	def userInterface:Rumms	= new Rumms {
+		def codePath:String	=
+				outer.codePath
+		def start(callbacks:RummsCallbacks):Unit	=
+				outer start callbacks
+		def dispose():Unit	=
+				outer.dispose()
+		def conversationIds:Set[ConversationId]		=
+				outer.conversationIds
+		def sendMessage(receiver:ConversationId, message:JSONValue):Boolean	=
+				outer sendMessage (receiver, message)
+	}
 	
 	//------------------------------------------------------------------------------
 	//## life cycle

@@ -24,17 +24,9 @@ import scwebapp.status._
 
 import rumms.impl.HandlerUtil._
 
-object RummsHandler {
-	object paths {
-		val code	= "/code"
-		val hi		= "/hi"
-		val comm	= "/comm"
-	}
-}
-
 /** mount this with an url-pattern of /rumms/STAR (where STAR is a literal "*") */
-final class RummsHandler(application:RummsApplication, configuration:RummsConfiguration) extends HttpServlet with Logging {
-	import RummsHandler.paths
+final class RummsHandler(application:RummsApplication, configuration:RummsConfiguration) extends Logging {
+	import Constants.paths
 	
 	private val serverVersion	=
 			Constants.version.toString + "/" + configuration.version
@@ -149,11 +141,13 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 					// give new messages to the client
 					conversation handleIncoming (incoming, clientCont)
 					
-					def compileResponse(batch:Batch):String =
-							JSONCodec encode jsonObject(
-								"clientCont"	-> clientCont,
-								"serverCont"	-> batch.serverCont,
-								"messages"		-> batch.messages
+					def compileResponse(batch:Batch):HttpResponder =
+							BatchResponder(
+								JSONCodec encode jsonObject(
+									"clientCont"	-> clientCont,
+									"serverCont"	-> batch.serverCont,
+									"messages"		-> batch.messages
+								)
 							)
 						
 					// maybe there already are new messages
@@ -161,13 +155,17 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 					// incoming messages should not block the receiver
 					if (fromConversation.messages.nonEmpty || incoming.nonEmpty) {
 						// DEBUG("sending available data immediately", continuation)
-						BatchRespose(compileResponse(fromConversation))
+						compileResponse(fromConversation)
 					}
 					else {
 						val asyncCtx	= request.startAsync()
 						asyncCtx setTimeout Constants.continuationTTL.millis
 						
-						// TODO ugly
+						def completeWith(responder:HttpResponder) {
+							responder apply asyncCtx.getResponse.asInstanceOf[HttpServletResponse]
+							asyncCtx.complete()
+						}
+						
 						@volatile
 						var alive	= true
 						
@@ -179,25 +177,18 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 							}
 							def onTimeout(ev:AsyncEvent)	{
 								alive	= false
-								// TODO why send anything here?
-								val	asyncResponse	= asyncCtx.getResponse.asInstanceOf[HttpServletResponse]
-								BatchRespose(compileResponse(conversation fetchOutgoing serverCont)) apply asyncResponse
-								asyncCtx.complete()
+								completeWith(compileResponse(conversation fetchOutgoing serverCont))
 							}	
 							def onError(ev:AsyncEvent)		{
 								alive	= false
-								// TODO why send anything here?
-								val	asyncResponse	= asyncCtx.getResponse.asInstanceOf[HttpServletResponse]
-								InternalError apply asyncResponse
-								asyncCtx.complete()
+								// TODO is this actually allowed?
+								completeWith(InternalError)
 							}
 						}
 						
 						conversation onHasOutgoing thunk {
 							if (alive) {
-								val	asyncResponse	= asyncCtx.getResponse.asInstanceOf[HttpServletResponse]
-								BatchRespose(compileResponse(conversation fetchOutgoing serverCont)) apply asyncResponse
-								asyncCtx.complete()
+								completeWith(compileResponse(conversation fetchOutgoing serverCont))
 							}
 						}
 						
@@ -226,7 +217,6 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 	private val NotFound:HttpResponder		= SetStatus(NOT_FOUND)
 	private val InternalError:HttpResponder	= SetStatus(INTERNAL_SERVER_ERROR)
 	
-	// BETTER allow caching?
 	private def ClientCode(code:String):HttpResponder	=
 			SetContentType(text_javascript	withCharset Constants.encoding)	~>
 			SendString(code)
@@ -240,7 +230,7 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 	private val Disconnected:HttpResponder	=
 			SendPlainTextCharset(DISCONNECTED_TEXT)
 			
-	private def BatchRespose(text:String):HttpResponder	=
+	private def BatchResponder(text:String):HttpResponder	=
 			SetContentType(application_json)	~>
 			SendString(text)
 					

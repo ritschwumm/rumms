@@ -12,4 +12,10 @@ object Constants {
 	val conversationTTL	= clientTTL			*! 3
 	val sendDelay		= 100.millis
 	val secureIds		= true
+	
+	object paths {
+		val code	= "/code"
+		val hi		= "/hi"
+		val comm	= "/comm"
+	}
 }
