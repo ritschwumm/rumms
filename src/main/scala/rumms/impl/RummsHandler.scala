@@ -50,7 +50,7 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 				// TODO ugly, but changes how parameters are parsed and what getReader does
 				request	setEncoding	Constants.encoding
 				
-				val responder:HttpResponder	 = plan(request)
+				val responder:HttpResponder	 = planImpl(request)
 				
 				response	=>
 				try {
