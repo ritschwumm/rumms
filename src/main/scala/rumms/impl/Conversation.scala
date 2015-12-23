@@ -33,7 +33,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 			synchronized {
 				// TODO how can it happen that requests overtake each other?
 				if (clientCont < lastClientCont) {
-					WARN(s"clientCont: ${lastClientCont}->${clientCont}")
+					WARN(so"clientCont: ${lastClientCont.toString}->${clientCont.toString}")
 					return
 				}
 				val expected	= (clientCont - lastClientCont)

@@ -85,7 +85,7 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 		
 	private def clientCode(servletPrefix:String):String	= {
 		val resource	= "/rumms/Client.js"
-		val stream		= getClass getResourceAsStream resource nullError s"cannot access resource ${resource}"
+		val stream		= getClass getResourceAsStream resource nullError so"cannot access resource ${resource}"
 		val raw			= stream use { stream => new InputStreamReader(stream, Config.encoding.name).readFully }
 		configure(raw, Map(
 			"VERSION"			-> JSONString(serverVersion),
