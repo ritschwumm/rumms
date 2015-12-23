@@ -16,7 +16,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	
 	@volatile
 	private var touched:MilliInstant	= MilliInstant.zero
-	def alive:Boolean	= touched +! Config.conversationTTL > MilliInstant.now
+	def alive:Boolean	= touched +! Constants.conversationTTL > MilliInstant.now
 	def touch()			{ touched = MilliInstant.now }
 	
 	//------------------------------------------------------------------------------
@@ -88,7 +88,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	// to give the queue a chance to grow a little bit before sending
 	def maybePublish() {
 		synchronized {
-			(MilliInstant.now - lastAppend >= Config.sendDelay) &&
+			(MilliInstant.now - lastAppend >= Constants.sendDelay) &&
 			entries.nonEmpty flatGuard {
 				val out	= publishers
 				publishers	= None

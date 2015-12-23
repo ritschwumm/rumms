@@ -4,7 +4,7 @@ import scutil.io.Charsets
 import scutil.time.implicits._
 
 // TODO hardcoded
-object Config {
+object Constants {
 	val version			= 1
 	val encoding		= Charsets.utf_8
 	val continuationTTL	= 1.minutes

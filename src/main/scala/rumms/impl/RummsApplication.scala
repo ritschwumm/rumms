@@ -9,13 +9,16 @@ import scutil.implicits._
 import scutil.log._
 import scutil.worker._
 
+import scwebapp.HttpHandlerServlet
+
 import scjson._
 
 object RummsApplication {
 	/** must be called from a ServletContextListener.contextInitialized method */
 	def create(sc:ServletContext, configuration:RummsConfiguration):Rumms	= {
 		val application	= new RummsApplication(configuration)
-		val servlet		= new RummsServlet(application, configuration)
+		val handler		= new RummsHandler(application, configuration)
+		val servlet		= new HttpHandlerServlet(handler.plan)
 		val mapping		= configuration.path + "/*"
 		val dynamic		= sc addServlet ("RummsServlet", servlet)
 		dynamic setLoadOnStartup	100
@@ -29,7 +32,7 @@ final class RummsApplication(configuration:RummsConfiguration) extends Rumms wit
 	@volatile
 	private var callbacks:RummsCallbacks	= null
 	
-	val codePath:String	= (configuration.path substring 1) + RummsServlet.paths.code + "?_="
+	val codePath:String	= (configuration.path substring 1) + RummsHandler.paths.code + "?_="
 	
 	//------------------------------------------------------------------------------
 	//## life cycle
@@ -46,7 +49,7 @@ final class RummsApplication(configuration:RummsConfiguration) extends Rumms wit
 	}
 	
 	def dispose() {
-		DEBUG("destroying sendworker")
+		DEBUG("destroying send worker")
 		
 		sendWorker.dispose()
 		sendWorker.awaitWorkless()
@@ -62,9 +65,9 @@ final class RummsApplication(configuration:RummsConfiguration) extends Rumms wit
 	private lazy val sendWorker	=
 			new Worker(
 				"conversation publisher",
-				Config.sendDelay,
+				Constants.sendDelay,
 				publishConversations,
-				e => ERROR("publishing conversations failed", e)
+				ERROR("publishing conversations failed", _)
 			)
 			
 	def sendMessage(receiver:ConversationId, message:JSONValue):Boolean	=
@@ -75,7 +78,7 @@ final class RummsApplication(configuration:RummsConfiguration) extends Rumms wit
 	//------------------------------------------------------------------------------
 	//## conversation management
 	
-	private val idGenerator	= new IdGenerator(Config.secureIds)
+	private val idGenerator	= new IdGenerator(Constants.secureIds)
 	
 	private def nextConversationId():ConversationId	=
 			ConversationId(IdPrisms.IdString read idGenerator.next)

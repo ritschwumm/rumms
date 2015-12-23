@@ -6,6 +6,9 @@ import scutil.implicits._
 import scwebapp._
 
 private object HandlerUtil {
+	//------------------------------------------------------------------------------
+	//## actions
+	
 	type Action[T]	= Tried[(HttpResponder, Problem), T]
 	
 	def actionLog(action:Action[Any]):Option[ISeq[Any]]	=
@@ -13,6 +16,9 @@ private object HandlerUtil {
 		
 	def actionResponder(action:Action[HttpResponder]):HttpResponder	=
 			action cata (_._1, identity)
+		
+	//------------------------------------------------------------------------------
+	//## problems
 	
 	sealed trait Problem {
 		def loggable:ISeq[Any]
@@ -23,6 +29,9 @@ private object HandlerUtil {
 	case class ExceptionProblem(message:String, exception:Exception) extends Problem {
 		def loggable:ISeq[Any]	= ISeq(message, exception)
 	}
+	
+	//------------------------------------------------------------------------------
+	//## syntax
 	
 	implicit class ProblematicTriedException[F<:Exception, W](peer:Tried[F, W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=

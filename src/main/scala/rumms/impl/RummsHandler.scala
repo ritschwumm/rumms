@@ -24,7 +24,7 @@ import scwebapp.status._
 
 import rumms.impl.HandlerUtil._
 
-object RummsServlet {
+object RummsHandler {
 	object paths {
 		val code	= "/code"
 		val hi		= "/hi"
@@ -33,42 +33,41 @@ object RummsServlet {
 }
 
 /** mount this with an url-pattern of /rumms/STAR (where STAR is a literal "*") */
-final class RummsServlet(application:RummsApplication, configuration:RummsConfiguration) extends HttpServlet with Logging {
-	import RummsServlet.paths
+final class RummsHandler(application:RummsApplication, configuration:RummsConfiguration) extends HttpServlet with Logging {
+	import RummsHandler.paths
 	
 	private val serverVersion	=
-			Config.version.toString + "/" + configuration.version
+			Constants.version.toString + "/" + configuration.version
 		
 	//------------------------------------------------------------------------------
 	//## request handling
 	
-	override def doGet(request:HttpServletRequest, response:HttpServletResponse) {
-		handle(request, response)
-	}
-	
-	override def doPost(request:HttpServletRequest, response:HttpServletResponse) {
-		handle(request, response)
-	}
-	
-	private def handle(request:HttpServletRequest, response:HttpServletResponse) {
-		try {
-			application.expireConversations()
+	lazy val plan:HttpHandler	=
+			request =>
+			try {
+				application.expireConversations()
+				
+				// TODO ugly, but changes how parameters are parsed and what getReader does
+				request	setEncoding	Constants.encoding
+				
+				val responder:HttpResponder	 = plan(request)
+				
+				response	=>
+				try {
+					response	noCache	()
+					responder	apply	response
+				}
+				catch { case e:Exception =>
+					ERROR(e)
+					throw e
+				}
+			}
+			catch { case e:Exception =>
+				ERROR(e)
+				throw e
+			}
 			
-			// TODO ugly, but changes how parameters are parsed and what getReader does
-			request	setEncoding	Config.encoding
-			// NOTE this would change the content type, but we send that explicitly
-			// response	setEncoding	Config.encoding
-			response noCache	()
-			
-			plan(request)(response)
-		}
-		catch { case e:Exception =>
-			ERROR(e)
-			throw e
-		}
-	}
-	
-	private lazy val plan:HttpHandler	=
+	private lazy val planImpl:HttpHandler	=
 			(PathInfoUTF8(paths.code)	guardOn	code)	orElse
 			(PathInfoUTF8(paths.hi)		guardOn	hi)		orElse
 			(PathInfoUTF8(paths.comm)	guardOn	comm)	orAlways
@@ -86,11 +85,11 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 	private def clientCode(servletPrefix:String):String	= {
 		val resource	= "/rumms/Client.js"
 		val stream		= getClass getResourceAsStream resource nullError so"cannot access resource ${resource}"
-		val raw			= stream use { stream => new InputStreamReader(stream, Config.encoding.name).readFully }
+		val raw			= stream use { stream => new InputStreamReader(stream, Constants.encoding.name).readFully }
 		configure(raw, Map(
 			"VERSION"			-> JSONString(serverVersion),
-			"ENCODING"			-> JSONString(Config.encoding.name),
-			"CLIENT_TTL"		-> JSONNumber(Config.clientTTL.millis),
+			"ENCODING"			-> JSONString(Constants.encoding.name),
+			"CLIENT_TTL"		-> JSONNumber(Constants.clientTTL.millis),
 			"SERVLET_PREFIX"	-> JSONString(servletPrefix),
 			"USER_DATA"			-> configuration.userData
 		))
@@ -166,7 +165,7 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 					}
 					else {
 						val asyncCtx	= request.startAsync()
-						asyncCtx setTimeout Config.continuationTTL.millis
+						asyncCtx setTimeout Constants.continuationTTL.millis
 						
 						// TODO ugly
 						@volatile
@@ -229,7 +228,7 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 	
 	// BETTER allow caching?
 	private def ClientCode(code:String):HttpResponder	=
-			SetContentType(text_javascript	withCharset Config.encoding)	~>
+			SetContentType(text_javascript	withCharset Constants.encoding)	~>
 			SendString(code)
 	
 	private def Connected(conversationId:ConversationId):HttpResponder	=
@@ -246,6 +245,6 @@ final class RummsServlet(application:RummsApplication, configuration:RummsConfig
 			SendString(text)
 					
 	private def SendPlainTextCharset(s:String):HttpResponder	=
-			SetContentType(text_plain withCharset Config.encoding)	~>
+			SetContentType(text_plain withCharset Constants.encoding)	~>
 			SendString(s)
 }
