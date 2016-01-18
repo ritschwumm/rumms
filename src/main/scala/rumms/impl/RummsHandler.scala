@@ -15,7 +15,6 @@ import scjson.serialization._
 import scjson.JSONNavigation._
 
 import scwebapp._
-//import scwebapp.implicits._
 import scwebapp.instances._
 import scwebapp.status._
 
