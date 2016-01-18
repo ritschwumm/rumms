@@ -4,9 +4,6 @@ package impl
 import java.io._
 import java.nio.charset.Charset
 
-import javax.servlet._
-import javax.servlet.http._
-
 import scutil.lang._
 import scutil.implicits._
 import scutil.log._
@@ -18,7 +15,7 @@ import scjson.serialization._
 import scjson.JSONNavigation._
 
 import scwebapp._
-import scwebapp.implicits._
+//import scwebapp.implicits._
 import scwebapp.instances._
 import scwebapp.status._
 
@@ -38,14 +35,7 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 			request =>
 			try {
 				application.expireConversations()
-				response	=>
-				try {
-					planImpl(request) ~> NoCache	apply	response
-				}
-				catch { case e:Exception =>
-					ERROR(e)
-					throw e
-				}
+				planImpl(request)
 			}
 			catch { case e:Exception =>
 				ERROR(e)
@@ -56,14 +46,14 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 			(PathInfoUTF8(paths.code)	guardOn	code)	orElse
 			(PathInfoUTF8(paths.hi)		guardOn	hi)		orElse
 			(PathInfoUTF8(paths.comm)	guardOn	comm)	orAlways
-			Respond(NotFound)
+			constant(HttpResponder(EmptyStatus(NOT_FOUND)))
 	
 	//------------------------------------------------------------------------------
 	//## code transfer
 	
 	/** send javascript code for client configuration */
-	private def code(request:HttpServletRequest):HttpResponder	= {
-		val servletPrefix	= request.getContextPath + request.getServletPath
+	private def code(request:HttpRequest):HttpResponder	= {
+		val servletPrefix	= request.contextPath + request.servletPath
 		ClientCode(clientCode(servletPrefix))
 	}
 		
@@ -99,7 +89,7 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 	import Protocol._
 	
 	/** establish a new Conversation */
-	private def hi(request:HttpServletRequest):HttpResponder	= {
+	private def hi(request:HttpRequest):HttpResponder	= {
 		// BETTER send JSON data here
 		val action	=
 				for {
@@ -115,7 +105,7 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 	}
 	
 	/** receive and send messages for a single Conversation */
-	private def comm(request:HttpServletRequest):HttpResponder	= {
+	private def comm(request:HttpRequest):HttpResponder	= {
 		val action:Action[HttpResponder]	=
 				for {
 					json			<- bodyString(request)							toUse (Forbidden,		"unreadable message")
@@ -134,8 +124,8 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 					// give new messages to the client
 					conversation handleIncoming (incoming, clientCont)
 					
-					def compileResponse(batch:Batch):HttpResponder =
-							BatchResponder(
+					def compileResponse(batch:Batch):HttpResponse =
+							JsonOK(
 								JSONCodec encode jsonObject(
 									"clientCont"	-> clientCont,
 									"serverCont"	-> batch.serverCont,
@@ -148,44 +138,23 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 					// incoming messages should not block the receiver
 					if (fromConversation.messages.nonEmpty || incoming.nonEmpty) {
 						// DEBUG("sending available data immediately", continuation)
-						compileResponse(fromConversation)
+						HttpResponder(compileResponse(fromConversation))
 					}
 					else {
-						val asyncCtx	= request.startAsync()
-						asyncCtx setTimeout Constants.continuationTTL.millis
-						
-						def completeWith(responder:HttpResponder) {
-							responder apply asyncCtx.getResponse.asInstanceOf[HttpServletResponse]
-							asyncCtx.complete()
-						}
-						
-						@volatile
-						var alive	= true
-						
-						// all throws IOException
-						asyncCtx addListener new AsyncListener {
-							def onStartAsync(ev:AsyncEvent)	{}
-							def onComplete(ev:AsyncEvent)	{
-								alive	= false	
-							}
-							def onTimeout(ev:AsyncEvent)	{
-								alive	= false
-								completeWith(compileResponse(conversation fetchOutgoing serverCont))
-							}	
-							def onError(ev:AsyncEvent)		{
-								alive	= false
-								// TODO is this actually allowed?
-								completeWith(InternalError)
-							}
-						}
-						
+						val (responder, send)	=
+								HttpResponder async (
+									timeout	= Constants.continuationTTL,
+									timeoutResponse	= thunk {
+										compileResponse(conversation fetchOutgoing serverCont)
+									},
+									errorResponse	= thunk {
+										EmptyStatus(INTERNAL_SERVER_ERROR)
+									}
+								)
 						conversation onHasOutgoing thunk {
-							if (alive) {
-								completeWith(compileResponse(conversation fetchOutgoing serverCont))
-							}
+							send(compileResponse(conversation fetchOutgoing serverCont))
 						}
-						
-						Pass
+						responder
 					}
 				}
 				
@@ -193,7 +162,7 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 		actionResponder(action)
 	}
 	
-	private def bodyString(request:HttpServletRequest):Tried[Exception,String]	=
+	private def bodyString(request:HttpRequest):Tried[Exception,String]	=
 			Catch.exception in (request.body readString Constants.encoding)
 	
 	//------------------------------------------------------------------------------
@@ -209,13 +178,10 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 	private val UPLOADED_TEXT		= "OK"
 	private val UPGRADED_TEXT		= "VERSION"
 	
-	private val Forbidden:HttpResponder		= SetStatus(FORBIDDEN)
-	private val NotFound:HttpResponder		= SetStatus(NOT_FOUND)
-	private val InternalError:HttpResponder	= SetStatus(INTERNAL_SERVER_ERROR)
+	private val Forbidden:HttpResponder		= HttpResponder(EmptyStatus(FORBIDDEN))
 	
 	private def ClientCode(code:String):HttpResponder	=
-			SetContentType(text_javascript	withCharset Constants.encoding)	~>
-			SendString(Constants.encoding, code)
+			HttpResponder(StringOK(code, text_javascript))
 	
 	private def Connected(conversationId:ConversationId):HttpResponder	=
 			SendPlainTextCharset(CONNECTED_TEXT + " " + conversationId.idval)
@@ -226,11 +192,28 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 	private val Disconnected:HttpResponder	=
 			SendPlainTextCharset(DISCONNECTED_TEXT)
 			
-	private def BatchResponder(text:String):HttpResponder	=
-			SetContentType(application_json)	~>
-			SendString(Constants.encoding, text)
-					
 	private def SendPlainTextCharset(s:String):HttpResponder	=
-			SetContentType(text_plain withCharset Constants.encoding)	~>
-			SendString(Constants.encoding, s)
+			HttpResponder(StringOK(s, text_plain))
+		
+	//------------------------------------------------------------------------------
+
+	private def JsonOK(s:String):HttpResponse	=
+			StringOK(s, application_json)
+					
+	private def EmptyStatus(status:HttpStatus):HttpResponse	=
+			HttpResponse(
+				status,	None,
+				NoCache,
+				HttpOutput.empty
+			)
+			
+	private def StringOK(text:String, contentType:MimeType):HttpResponse	=
+			HttpResponse(
+				OK,	None,
+				NoCache ++
+				Vector(
+					ContentType(contentType	withCharset Constants.encoding)
+				),
+				HttpOutput writeString (Constants.encoding, text)
+			)
 }

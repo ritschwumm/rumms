@@ -7,7 +7,7 @@ import scutil.implicits._
 import scutil.log._
 import scutil.worker._
 
-import scwebapp.implicits._
+import scwebapp.servlet.implicits._
 import scwebapp.HttpHandler
 
 import scjson._
@@ -20,8 +20,7 @@ object RummsApplication {
 			name			= "RummsServlet",
 			handler			= application.httpHandler,
 			mappings		= Vector(configuration.path + "/*"),
-			loadOnStartup	= Some(100),
-			asyncSupported	= true
+			loadOnStartup	= Some(100)
 		)
 		application.userInterface
 	}
