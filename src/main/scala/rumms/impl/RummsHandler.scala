@@ -219,7 +219,7 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 	
 	private def ClientCode(code:String):HttpResponder	=
 			SetContentType(text_javascript	withCharset Constants.encoding)	~>
-			SendString(code)
+			SendString(Constants.encoding, code)
 	
 	private def Connected(conversationId:ConversationId):HttpResponder	=
 			SendPlainTextCharset(CONNECTED_TEXT + " " + conversationId.idval)
@@ -232,9 +232,9 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 			
 	private def BatchResponder(text:String):HttpResponder	=
 			SetContentType(application_json)	~>
-			SendString(text)
+			SendString(Constants.encoding, text)
 					
 	private def SendPlainTextCharset(s:String):HttpResponder	=
 			SetContentType(text_plain withCharset Constants.encoding)	~>
-			SendString(s)
+			SendString(Constants.encoding, s)
 }
