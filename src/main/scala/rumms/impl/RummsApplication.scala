@@ -2,15 +2,13 @@ package rumms
 package impl
 
 import javax.servlet.ServletContext
-import javax.servlet.MultipartConfigElement
 
-//import scutil.lang._
 import scutil.implicits._
 import scutil.log._
 import scutil.worker._
 
+import scwebapp.implicits._
 import scwebapp.HttpHandler
-import scwebapp.HttpHandlerServlet
 
 import scjson._
 
@@ -18,12 +16,13 @@ object RummsApplication {
 	/** must be called from a ServletContextListener.contextInitialized method */
 	def create(sc:ServletContext, configuration:RummsConfiguration):Rumms	= {
 		val application	= new RummsApplication(configuration)
-		val servlet		= new HttpHandlerServlet(application.httpHandler)
-		val mapping		= configuration.path + "/*"
-		val dynamic		= sc addServlet ("RummsServlet", servlet)
-		dynamic setLoadOnStartup	100
-		dynamic addMapping			mapping
-		dynamic setAsyncSupported	true
+		sc mount (
+			name			= "RummsServlet",
+			handler			= application.httpHandler,
+			mappings		= Vector(configuration.path + "/*"),
+			loadOnStartup	= Some(100),
+			asyncSupported	= true
+		)
 		application.userInterface
 	}
 }
