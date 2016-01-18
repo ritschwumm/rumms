@@ -38,16 +38,9 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 			request =>
 			try {
 				application.expireConversations()
-				
-				// TODO ugly, but changes how parameters are parsed and what getReader does
-				request	setEncoding	Constants.encoding
-				
-				val responder:HttpResponder	 = planImpl(request)
-				
 				response	=>
 				try {
-					response	noCache	()
-					responder	apply	response
+					planImpl(request) ~> NoCache	apply	response
 				}
 				catch { case e:Exception =>
 					ERROR(e)
@@ -110,7 +103,7 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 		// BETTER send JSON data here
 		val action	=
 				for {
-					clientVersion	<- Catch.exception in (request.getReader use { _.readFully })	toUse (Forbidden,	"unreadable message")
+					clientVersion	<- bodyString(request)	toUse (Forbidden,	"unreadable message")
 				}
 				yield clientVersion == serverVersion cata (
 					Upgrade,
@@ -125,14 +118,14 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 	private def comm(request:HttpServletRequest):HttpResponder	= {
 		val action:Action[HttpResponder]	=
 				for {
-					json			<- Catch.exception in (request.getReader use { _.readFully })	toUse (Forbidden,		"unreadable message")
-					data			<- JSONCodec decode json										toUse (Forbidden,		"invalid message")
+					json			<- bodyString(request)							toUse (Forbidden,		"unreadable message")
+					data			<- JSONCodec decode json						toUse (Forbidden,		"invalid message")
 					// TODO ugly
-					conversationId	<- (data / "conversation").string								toUse (Forbidden,		"conversationId missing")	map ConversationId.apply
-					clientCont		<- (data / "clientCont").long									toUse (Forbidden,		"clientCont missing")
-					serverCont		<- (data / "serverCont").long									toUse (Forbidden,		"serverCont missing")
-					incoming		<- (data / "messages").arraySeq									toUse (Forbidden,		"messages missing")
-					conversation	<- application useConversation conversationId					toUse (Disconnected,	"unknown conversation")
+					conversationId	<- (data / "conversation").string				toUse (Forbidden,		"conversationId missing")	map ConversationId.apply
+					clientCont		<- (data / "clientCont").long					toUse (Forbidden,		"clientCont missing")
+					serverCont		<- (data / "serverCont").long					toUse (Forbidden,		"serverCont missing")
+					incoming		<- (data / "messages").arraySeq					toUse (Forbidden,		"messages missing")
+					conversation	<- application useConversation conversationId	toUse (Disconnected,	"unknown conversation")
 				}
 				yield {
 					// tell the client it's alive
@@ -199,6 +192,9 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 		actionLog(action) foreach { ERROR(_:_*) }
 		actionResponder(action)
 	}
+	
+	private def bodyString(request:HttpServletRequest):Tried[Exception,String]	=
+			Catch.exception in (request.body readString Constants.encoding)
 	
 	//------------------------------------------------------------------------------
 	//## helper
