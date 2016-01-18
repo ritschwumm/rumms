@@ -17,6 +17,7 @@ import scjson.JSONNavigation._
 import scwebapp._
 import scwebapp.instances._
 import scwebapp.status._
+import scwebapp.data.MimeType
 
 import rumms.impl.HandlerUtil._
 
