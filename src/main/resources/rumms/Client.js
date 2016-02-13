@@ -118,7 +118,7 @@ rumms.Conversation.prototype = {
 	},
 	
 	hiError: function(exception) {
-		this.connected	= false;
+		this.connected		= false;
 
 		this.conversationId = null;
 		

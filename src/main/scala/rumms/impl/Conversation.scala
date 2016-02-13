@@ -15,7 +15,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	//## state
 	
 	@volatile
-	private var touched:MilliInstant	= MilliInstant.zero
+	private var touched:MilliInstant	= MilliInstant.now
 	def alive:Boolean	= touched +! Constants.conversationTTL > MilliInstant.now
 	def touch()			{ touched = MilliInstant.now }
 	
@@ -61,20 +61,10 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	def appendOutgoing(message:JSONValue):Unit	=
 			synchronized {
 				val entry	= Entry(nextId, message)
-				
 				nextId		+= 1
 				entries		+:= entry
-				
 				lastAppend	= MilliInstant.now
-				
-				// val out	= publishers
-				// publishers	= None
-				// out
 			}
-			// .foreach { it =>
-			// 	try { it() }
-			// 	catch { case e:Exception => ERROR(e) }
-			// }
 	
 	/** called when the browser wants to receive some messages */
 	def fetchOutgoing(serverCont:Long):Batch =

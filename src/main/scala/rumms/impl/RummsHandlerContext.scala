@@ -4,5 +4,5 @@ package impl
 trait RummsHandlerContext {
 	def createConversation():ConversationId
 	def expireConversations():Unit
-	def useConversation(id:ConversationId):Option[Conversation]
+	def findConversation(id:ConversationId):Option[Conversation]
 }

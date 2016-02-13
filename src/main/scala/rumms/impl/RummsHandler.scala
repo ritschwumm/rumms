@@ -22,7 +22,7 @@ import scwebapp.data.MimeType
 
 import rumms.impl.HandlerUtil._
 
-/** mount this with an url-pattern of /rumms/STAR (where STAR is a literal "*") */
+/** mount this with an url-pattern of <configuration.path>/STAR (where STAR is a literal "*") */
 final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerContext) extends Logging {
 	import Constants.paths
 	
@@ -36,25 +36,27 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 			request =>
 			try {
 				context.expireConversations()
-				planImpl(request)
+				planImplTotal(request)
 			}
 			catch { case e:Exception =>
 				ERROR(e)
 				throw e
 			}
 			
-	private lazy val planImpl:HttpHandler	=
-			(PathInfoUTF8(paths.code)	guardOn	code)	orElse
-			(PathInfoUTF8(paths.hi)		guardOn	hi)		orElse
-			(PathInfoUTF8(paths.comm)	guardOn	comm)	orAlways
-			constant(HttpResponder(EmptyStatus(NOT_FOUND)))
+	private lazy val planImplTotal:HttpHandler	=
+			planImplPartial orAlways constant(HttpResponder(EmptyStatus(NOT_FOUND)))
+			
+	private lazy val planImplPartial:HttpPHandler	=
+			(FullPathUTF8(configuration.path + paths.code)	guardOn	code)	orElse
+			(FullPathUTF8(configuration.path + paths.hi)	guardOn	hi)		orElse
+			(FullPathUTF8(configuration.path + paths.comm)	guardOn	comm)
 	
 	//------------------------------------------------------------------------------
 	//## code transfer
 	
 	/** send javascript code for client configuration */
 	private def code(request:HttpRequest):HttpResponder	= {
-		val servletPrefix	= request.contextPath + request.servletPath
+		val servletPrefix	= request.contextPath + configuration.path
 		ClientCode(clientCode(servletPrefix))
 	}
 		
@@ -82,11 +84,10 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	//------------------------------------------------------------------------------
 	//## message transfer
 	
-	private object Protocol
+	private object MyProtocol
 			extends	NativeProtocol
 			with	ISeqProtocol
 			with	IdentityProtocol
-	import Protocol._
 	
 	/** establish a new Conversation */
 	private def hi(request:HttpRequest):HttpResponder	= {
@@ -106,18 +107,21 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	
 	/** receive and send messages for a single Conversation */
 	private def comm(request:HttpRequest):HttpResponder	= {
+		import MyProtocol._
+		
 		val action:Action[HttpResponder]	=
 				for {
-					json			<- bodyString(request)							toUse (Forbidden,		"unreadable message")
-					data			<- JSONCodec decode json						toUse (Forbidden,		"invalid message")
-					// TODO ugly
-					conversationId	<- (data / "conversation").string				toUse (Forbidden,		"conversationId missing")	map ConversationId.apply
-					clientCont		<- (data / "clientCont").long					toUse (Forbidden,		"clientCont missing")
-					serverCont		<- (data / "serverCont").long					toUse (Forbidden,		"serverCont missing")
-					incoming		<- (data / "messages").arraySeq					toUse (Forbidden,		"messages missing")
-					conversation	<- context useConversation conversationId	toUse (Disconnected,	"unknown conversation")
+					json			<- bodyString(request)						toUse (Forbidden,		"unreadable message")
+					data			<- JSONCodec decode json					toUse (Forbidden,		"invalid message")
+					conversationId	<- (data / "conversation").string			toUse (Forbidden,		"conversationId missing")	map ConversationId.apply
+					clientCont		<- (data / "clientCont").long				toUse (Forbidden,		"clientCont missing")
+					serverCont		<- (data / "serverCont").long				toUse (Forbidden,		"serverCont missing")
+					incoming		<- (data / "messages").arraySeq				toUse (Forbidden,		"messages missing")
+					conversation	<- context findConversation conversationId	toUse (Disconnected,	"unknown conversation")
 				}
 				yield {
+					conversation.touch()
+					
 					// tell the client it's alive
 					conversation.handleHeartbeat()
 					
@@ -133,11 +137,9 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 								)
 							)
 						
-					// maybe there already are new messages
+					// maybe there already are new messages, if not, we have to wait
 					val fromConversation	= conversation fetchOutgoing serverCont
-					// incoming messages should not block the receiver
 					if (fromConversation.messages.nonEmpty || incoming.nonEmpty) {
-						// DEBUG("sending available data immediately", continuation)
 						HttpResponder(compileResponse(fromConversation))
 					}
 					else {
@@ -167,11 +169,6 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	
 	//------------------------------------------------------------------------------
 	//## helper
-	
-	private implicit class MimeTypeExt(peer:MimeType) {
-		def withCharset(charset:Charset):MimeType	=
-				peer addParameter ("charset", charset.name)
-	}
 	
 	private val CONNECTED_TEXT		= "OK"
 	private val DISCONNECTED_TEXT	= "CONNECT"
@@ -212,7 +209,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				OK,	None,
 				NoCache ++
 				HeaderValues(
-					ContentType(contentType	withCharset Constants.encoding)
+					ContentType(contentType addParameter ("charset",  Constants.encoding.name))
 				),
 				HttpOutput writeString (Constants.encoding, text)
 			)

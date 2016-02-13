@@ -37,8 +37,8 @@ Usage
         final class DemoContextListener(sc:ServletContext) extends ServletContextListener {
             @volatile var rumms:Option[Rumms]   = None
             def contextInitialized(ev:ServletContextEvent) {
-                val config  = RummsConfiguration("/rumms", "0", JSONNull)
-                val rumms   = Rumms setup (ev.getServletContext, config)
+                val config  = RummsConfiguration("/rumms", "0")
+                val rumms   = Rumms create (ev.getServletContext, config)
                 rumms start new RummsCallbacks {
                     // ...
                 }

@@ -36,9 +36,9 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 	
 	private val uidGenerator	= new UidGenerator(Constants.secureIds)
 	private val rummsHandler	= new RummsHandler(configuration, new RummsHandlerContext{
-		def createConversation():ConversationId						= outer.createConversation()
-		def expireConversations():Unit								= outer.expireConversations()
-		def useConversation(id:ConversationId):Option[Conversation]	= outer useConversation id
+		def createConversation():ConversationId							= outer.createConversation()
+		def expireConversations():Unit									= outer.expireConversations()
+		def findConversation(id:ConversationId):Option[Conversation]	= outer findConversation id
 	})
 	private def httpHandler:HttpHandler	= rummsHandler.plan
 	
@@ -94,16 +94,10 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 	private def createConversation():ConversationId = {
 		val	conversationId	= nextConversationId()
 		val conversation	= new Conversation(conversationId, callbacks)
-		conversations update { entries =>
-			conversation.touch()
-			entries :+ conversation
-		}
+		conversations update { _ :+ conversation }
 		callbacks conversationAdded conversationId
 		conversationId
 	}
-	
-	private def useConversation(id:ConversationId):Option[Conversation]	=
-			findConversation(id) doto { _ foreach { _.touch() } }
 	
 	private def expireConversations() {
 		conversations
