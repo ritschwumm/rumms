@@ -17,6 +17,7 @@ import scjson.JSONNavigation._
 import scwebapp._
 import scwebapp.instances._
 import scwebapp.status._
+import scwebapp.header._
 import scwebapp.data.MimeType
 
 import rumms.impl.HandlerUtil._
@@ -211,7 +212,7 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 			HttpResponse(
 				OK,	None,
 				NoCache ++
-				Vector(
+				HeaderValues(
 					ContentType(contentType	withCharset Constants.encoding)
 				),
 				HttpOutput writeString (Constants.encoding, text)
