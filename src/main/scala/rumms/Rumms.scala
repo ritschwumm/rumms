@@ -3,27 +3,122 @@ package rumms
 import javax.servlet.ServletContext
 
 import scutil.lang._
+import scutil.implicits._
+import scutil.uid._
+import scutil.worker._
+import scutil.log._
 
-import scjson.JSONValue
+import scwebapp.servlet.implicits._
+import scwebapp.HttpHandler
 
-import rumms.impl.RummsApplication
+import scjson._
+
+import rumms.impl._
 
 object Rumms {
 	/** must be called from a ServletContextListener.contextInitialized method */
-	def create(sc:ServletContext, configuration:RummsConfiguration):Rumms	=
-			RummsApplication create (sc, configuration)
+	def create(sc:ServletContext, configuration:RummsConfiguration):Rumms	= {
+		new Rumms(configuration) doto { rumms =>
+			sc mount (
+				name			= "RummsServlet",
+				handler			= rumms.httpHandler,
+				mappings		= Vector(configuration.path + "/*"),
+				loadOnStartup	= Some(100)
+			)
+		}
+	}
 }
 
-/** must be disposed in a ServletContextListener.contextDestroyed method */
-trait Rumms extends Disposable {
-	def start(callbacks:RummsCallbacks):Unit
+final class Rumms(configuration:RummsConfiguration) extends Disposable with Logging { outer =>
+	@volatile
+	private var callbacks:RummsCallbacks	= null
+	private var conversations:Synchronized[ISeq[Conversation]]	= Synchronized(Vector.empty)
 	
-	/** ids of currently active Conversations */
-	def conversationIds:Set[ConversationId]
+	private val uidGenerator	= new UidGenerator(Constants.secureIds)
+	private val rummsHandler	= new RummsHandler(configuration, new RummsHandlerContext{
+		def createConversation():ConversationId						= outer.createConversation()
+		def expireConversations():Unit								= outer.expireConversations()
+		def useConversation(id:ConversationId):Option[Conversation]	= outer useConversation id
+	})
+	private def httpHandler:HttpHandler	= rummsHandler.plan
 	
-	/** send a message to a Conversation, returns success */
-	def sendMessage(receiver:ConversationId, message:JSONValue):Boolean
+	private val sendWorker	=
+			new Worker(
+				"conversation publisher",
+				Constants.sendDelay,
+				publishConversations,
+				ERROR("publishing conversations failed", _)
+			)
+			
+	//------------------------------------------------------------------------------
+	//## public interface
 	
 	/** relative to the webapp's context */
-	def codePath:String
+	val codePath:String	= (configuration.path substring 1) + Constants.paths.code + "?_="
+	
+	def start(callbacks:RummsCallbacks) {
+		require(this.callbacks == null, "rumms application is already started")
+		
+		this.callbacks	= callbacks
+		
+		DEBUG("starting send worker")
+		sendWorker.start()
+		
+		INFO("running")
+	}
+	
+	def dispose() {
+		DEBUG("destroying send worker")
+		
+		sendWorker.dispose()
+		sendWorker.awaitWorkless()
+		sendWorker.join()
+		
+		INFO("stopped")
+		this.callbacks	= null
+	}
+	
+	/** ids of currently active Conversations */
+	def conversationIds:Set[ConversationId]	=
+			(conversations.get map { _.id }).toSet
+	
+	/** send a message to a Conversation, returns success */
+	def sendMessage(receiver:ConversationId, message:JSONValue):Boolean	=
+			findConversation(receiver)
+			.someEffect	{ _ appendOutgoing message }
+			.isDefined
+			
+	//------------------------------------------------------------------------------
+	//## eonversations
+	
+	private def createConversation():ConversationId = {
+		val	conversationId	= nextConversationId()
+		val conversation	= new Conversation(conversationId, callbacks)
+		conversations update { entries =>
+			conversation.touch()
+			entries :+ conversation
+		}
+		callbacks conversationAdded conversationId
+		conversationId
+	}
+	
+	private def useConversation(id:ConversationId):Option[Conversation]	=
+			findConversation(id) doto { _ foreach { _.touch() } }
+	
+	private def expireConversations() {
+		conversations
+		.modify		{ _  partition { _.alive } }
+		.map		{ _.id }
+		.foreach	(callbacks.conversationRemoved)
+	}
+	
+	private def publishConversations() {
+		conversations.get foreach { _ maybePublish () }
+	}
+	
+	private def findConversation(id:ConversationId):Option[Conversation]	=
+			conversations.get find { _.id ==== id }
+		
+	private def nextConversationId():ConversationId	=
+			ConversationId(UidPrisms.String read uidGenerator.next)
 }

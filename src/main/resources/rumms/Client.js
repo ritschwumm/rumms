@@ -1,5 +1,4 @@
 var rumms	= {};
-rumms.userData	= @{USER_DATA};
 
 /*// type hint
 var ConversationContext = {

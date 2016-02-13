@@ -23,7 +23,7 @@ import scwebapp.data.MimeType
 import rumms.impl.HandlerUtil._
 
 /** mount this with an url-pattern of /rumms/STAR (where STAR is a literal "*") */
-final class RummsHandler(application:RummsApplication, configuration:RummsConfiguration) extends Logging {
+final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerContext) extends Logging {
 	import Constants.paths
 	
 	private val serverVersion	=
@@ -35,7 +35,7 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 	lazy val plan:HttpHandler	=
 			request =>
 			try {
-				application.expireConversations()
+				context.expireConversations()
 				planImpl(request)
 			}
 			catch { case e:Exception =>
@@ -66,8 +66,7 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 			"VERSION"			-> JSONString(serverVersion),
 			"ENCODING"			-> JSONString(Constants.encoding.name),
 			"CLIENT_TTL"		-> JSONNumber(Constants.clientTTL.millis),
-			"SERVLET_PREFIX"	-> JSONString(servletPrefix),
-			"USER_DATA"			-> configuration.userData
+			"SERVLET_PREFIX"	-> JSONString(servletPrefix)
 		))
 	}
 	
@@ -98,7 +97,7 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 				}
 				yield clientVersion == serverVersion cata (
 					Upgrade,
-					Connected(application.createConversation())
+					Connected(context.createConversation())
 				)
 					
 		actionLog(action) foreach { ERROR(_:_*) }
@@ -116,7 +115,7 @@ final class RummsHandler(application:RummsApplication, configuration:RummsConfig
 					clientCont		<- (data / "clientCont").long					toUse (Forbidden,		"clientCont missing")
 					serverCont		<- (data / "serverCont").long					toUse (Forbidden,		"serverCont missing")
 					incoming		<- (data / "messages").arraySeq					toUse (Forbidden,		"messages missing")
-					conversation	<- application useConversation conversationId	toUse (Disconnected,	"unknown conversation")
+					conversation	<- context useConversation conversationId	toUse (Disconnected,	"unknown conversation")
 				}
 				yield {
 					// tell the client it's alive
