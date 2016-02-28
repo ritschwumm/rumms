@@ -16,6 +16,7 @@ import scjson.JSONNavigation._
 
 import scwebapp._
 import scwebapp.instances._
+import scwebapp.method._
 import scwebapp.status._
 import scwebapp.header._
 import scwebapp.data.MimeType
@@ -32,24 +33,31 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	//------------------------------------------------------------------------------
 	//## request handling
 	
-	lazy val plan:HttpHandler	=
-			request =>
-			try {
-				context.expireConversations()
-				planImplTotal(request)
-			}
-			catch { case e:Exception =>
-				ERROR(e)
-				throw e
-			}
+	lazy val totalPlan:HttpHandler	=
+			partialPlan	orAlways
+			constant(HttpResponder(EmptyStatus(NOT_FOUND)))
 			
-	private lazy val planImplTotal:HttpHandler	=
-			planImplPartial orAlways constant(HttpResponder(EmptyStatus(NOT_FOUND)))
+	lazy val partialPlan:HttpPHandler	=
+			subHandler(GET,		paths.code,	code)	orElse
+			subHandler(POST,	paths.hi,	hi)		orElse
+			subHandler(POST,	paths.comm,	comm)
 			
-	private lazy val planImplPartial:HttpPHandler	=
-			(FullPathUTF8(configuration.path + paths.code)	guardOn	code)	orElse
-			(FullPathUTF8(configuration.path + paths.hi)	guardOn	hi)		orElse
-			(FullPathUTF8(configuration.path + paths.comm)	guardOn	comm)
+	private def subHandler(method:HttpMethod, subPath:String, handler:HttpHandler):HttpPHandler	=
+			req => {
+				(req.fullPathUTF8 ==== configuration.path + subPath) guard {
+					if (req.method.toOption == Some(method)) {
+						try {
+							context.expireConversations()
+							handler(req)
+						}
+						catch { case e:Exception =>
+							ERROR(e)
+							HttpResponder(EmptyStatus(INTERNAL_SERVER_ERROR))
+						}
+					}
+					else HttpResponder(EmptyStatus(METHOD_NOT_ALLOWED))
+				}
+			}
 	
 	//------------------------------------------------------------------------------
 	//## code transfer

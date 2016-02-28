@@ -40,7 +40,7 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 		def expireConversations():Unit									= outer.expireConversations()
 		def findConversation(id:ConversationId):Option[Conversation]	= outer findConversation id
 	})
-	private def httpHandler:HttpHandler	= rummsHandler.plan
+	private val httpHandler:HttpHandler	= rummsHandler.totalPlan
 	
 	private val sendWorker	=
 			new Worker(
