@@ -78,7 +78,6 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 		sendWorker.join()
 		
 		INFO("stopped")
-		this.callbacks	= null
 	}
 	
 	/** ids of currently active Conversations */
