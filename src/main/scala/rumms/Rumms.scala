@@ -8,8 +8,8 @@ import scutil.uid._
 import scutil.worker._
 import scutil.log._
 
+import scwebapp._
 import scwebapp.servlet.implicits._
-import scwebapp.HttpHandler
 
 import scjson._
 
@@ -22,7 +22,7 @@ object Rumms {
 			sc mount (
 				name			= "RummsServlet",
 				handler			= rumms.httpHandler,
-				mappings		= Vector(configuration.path + "/*"),
+				mappings		= Vector(rumms.mountPath),
 				loadOnStartup	= Some(100)
 			)
 		}
@@ -41,6 +41,7 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 		def findConversation(id:ConversationId):Option[Conversation]	= outer findConversation id
 	})
 	private val httpHandler:HttpHandler	= rummsHandler.totalPlan
+	private val mountPath:String		= configuration.path + "/*"
 	
 	private val sendWorker	=
 			new Worker(
@@ -52,6 +53,8 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 			
 	//------------------------------------------------------------------------------
 	//## public interface
+	
+	val partialHandler:HttpPHandler	= rummsHandler.partialPlan
 	
 	/** relative to the webapp's context */
 	val codePath:String	= (configuration.path substring 1) + Constants.paths.code + "?_="

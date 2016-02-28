@@ -100,7 +100,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	/** establish a new Conversation */
 	private def hi(request:HttpRequest):HttpResponder	= {
 		// BETTER send JSON data here
-		val action	=
+		val action:Action[HttpResponder]	=
 				for {
 					clientVersion	<- bodyString(request)	toUse (Forbidden,	"unreadable message")
 				}

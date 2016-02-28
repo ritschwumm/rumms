@@ -11,7 +11,7 @@ private object HandlerUtil {
 	
 	type Action[T]	= Tried[(HttpResponder, Problem), T]
 	
-	def actionLog(action:Action[Any]):Option[ISeq[Any]]	=
+	def actionLog(action:Action[_]):Option[ISeq[Any]]	=
 			action.swap.toOption map { _._2.loggable }
 		
 	def actionResponder(action:Action[HttpResponder]):HttpResponder	=
