@@ -1,7 +1,6 @@
 package rumms
 package impl
 
-import java.io._
 import java.nio.charset.Charset
 
 import scutil.lang._
@@ -69,9 +68,13 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	}
 		
 	private def clientCode(servletPrefix:String):String	= {
-		val resource	= "/rumms/Client.js"
-		val stream		= getClass getResourceAsStream resource nullError so"cannot access resource ${resource}"
-		val raw			= stream use { stream => new InputStreamReader(stream, Constants.encoding.name).readFully }
+		val resource	= "rumms/Client.js"
+		val raw	=
+				getClass.getClassLoader.resources
+				.readBytes	(resource)
+				.getOrError (so"cannot read resource ${resource}")
+				.into		(Constants.encoding.decodeTried)
+				.getOrError (so"cannot decode resource value")
 		configure(raw, Map(
 			"VERSION"			-> JSONString(serverVersion),
 			"ENCODING"			-> JSONString(Constants.encoding.name),
