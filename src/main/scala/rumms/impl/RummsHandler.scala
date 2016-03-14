@@ -5,6 +5,7 @@ import java.nio.charset.Charset
 
 import scutil.lang._
 import scutil.implicits._
+import scutil.io.Charsets
 import scutil.log._
 
 import scjson._
@@ -141,7 +142,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 					
 					def compileResponse(batch:Batch):HttpResponse =
 							JsonOK(
-								JSONCodec encode jsonObject(
+								jsonObject(
 									"clientCont"	-> clientCont,
 									"serverCont"	-> batch.serverCont,
 									"messages"		-> batch.messages
@@ -186,7 +187,8 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	private val UPLOADED_TEXT		= "OK"
 	private val UPGRADED_TEXT		= "VERSION"
 	
-	private val Forbidden:HttpResponder		= HttpResponder(EmptyStatus(FORBIDDEN))
+	private val Forbidden:HttpResponder		=
+			HttpResponder(EmptyStatus(FORBIDDEN))
 	
 	private def ClientCode(code:String):HttpResponder	=
 			HttpResponder(StringOK(code, text_javascript))
@@ -205,16 +207,19 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 		
 	//------------------------------------------------------------------------------
 
-	private def JsonOK(s:String):HttpResponse	=
-			StringOK(s, application_json)
-					
-	private def EmptyStatus(status:HttpStatus):HttpResponse	=
+	private def JsonOK(json:JSONValue):HttpResponse	=
 			HttpResponse(
-				status,	None,
-				NoCache,
-				HttpOutput.empty
+				OK,	None,
+				NoCache ++
+				HeaderValues(
+					ContentType(application_json)
+				),
+				HttpOutput writeString (
+					Charsets.utf_8,
+					JSONCodec encode json
+				)
 			)
-			
+					
 	private def StringOK(text:String, contentType:MimeType):HttpResponse	=
 			HttpResponse(
 				OK,	None,
@@ -223,5 +228,12 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 					ContentType(contentType addParameter ("charset",  Constants.encoding.name))
 				),
 				HttpOutput writeString (Constants.encoding, text)
+			)
+			
+	private def EmptyStatus(status:HttpStatus):HttpResponse	=
+			HttpResponse(
+				status,	None,
+				NoCache,
+				HttpOutput.empty
 			)
 }
