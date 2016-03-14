@@ -23,10 +23,10 @@ private object HandlerUtil {
 	sealed trait Problem {
 		def loggable:ISeq[Any]
 	}
-	case class PlainProblem(message:String) extends Problem {
+	final case class PlainProblem(message:String) extends Problem {
 		def loggable:ISeq[Any]	= ISeq(message)
 	}
-	case class ExceptionProblem(message:String, exception:Exception) extends Problem {
+	final case class ExceptionProblem(message:String, exception:Exception) extends Problem {
 		def loggable:ISeq[Any]	= ISeq(message, exception)
 	}
 	

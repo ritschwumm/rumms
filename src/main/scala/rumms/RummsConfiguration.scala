@@ -1,6 +1,6 @@
 package rumms
 
-case class RummsConfiguration(
+final case class RummsConfiguration(
 	/** where the servlet is mounted */
 	path:String,
 	

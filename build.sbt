@@ -1,6 +1,6 @@
 name			:= "rumms"
 organization	:= "de.djini"
-version			:= "0.131.0"
+version			:= "0.132.0"
 
 scalaVersion	:= "2.11.8"
 scalacOptions	++= Seq(
@@ -20,10 +20,21 @@ scalacOptions	++= Seq(
 
 conflictManager	:= ConflictManager.strict
 libraryDependencies	++= Seq(
-	"de.djini"			%%	"scutil-core"			% "0.81.0"	% "compile",
-	"de.djini"			%%	"scutil-uid"			% "0.81.0"	% "compile",
-	"de.djini"			%%	"scjson"				% "0.86.0"	% "compile",
-	"de.djini"			%%	"scwebapp-core"			% "0.111.0"	% "compile",
-	"de.djini"			%%	"scwebapp-servlet"		% "0.111.0"	% "compile",
+	"de.djini"			%%	"scutil-core"			% "0.82.0"	% "compile",
+	"de.djini"			%%	"scutil-uid"			% "0.82.0"	% "compile",
+	"de.djini"			%%	"scjson"				% "0.87.0"	% "compile",
+	"de.djini"			%%	"scwebapp-core"			% "0.112.0"	% "compile",
+	"de.djini"			%%	"scwebapp-servlet"		% "0.112.0"	% "compile",
 	"javax.servlet"		%   "javax.servlet-api"		% "3.1.0"	% "provided"
+)
+
+wartremoverErrors ++= Seq(
+	Wart.Any2StringAdd,
+	Wart.EitherProjectionPartial,
+	Wart.OptionPartial,
+	Wart.Enumeration,
+	Wart.FinalCaseClass,
+	Wart.JavaConversions,
+	Wart.Option2Iterable,
+	Wart.TryPartial
 )
