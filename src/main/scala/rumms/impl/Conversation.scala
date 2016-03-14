@@ -1,8 +1,6 @@
 package rumms
 package impl
 
-import java.io.InputStream
-
 import scutil.lang._
 import scutil.implicits._
 import scutil.time._

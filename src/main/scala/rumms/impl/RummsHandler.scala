@@ -1,8 +1,6 @@
 package rumms
 package impl
 
-import java.nio.charset.Charset
-
 import scutil.lang._
 import scutil.implicits._
 import scutil.io.Charsets
