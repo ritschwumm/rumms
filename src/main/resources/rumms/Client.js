@@ -8,10 +8,12 @@ var ConversationContext = {
 	disconnected:	function(conversationId)
 	// the server uses a different protocol version than the client
 	upgraded:		function(version)
+	// the connection is alive
+	beforeMessages:	function()
 	// the server sent a message
 	message:		function(object)
 	// the connection is alive
-	heartbeat:	function()
+	afterMessages:	function()
 	// the connection failed
 	error:			function(object)
 };
@@ -240,13 +242,13 @@ rumms.Conversation.prototype = {
 		}
 		
 		try {
-			this.context.heartbeat();
+			this.context.beforeMessages();
 		}
 		catch (e) {
-			this.notifyError("comm", "exception in heartbeat handler", e);
-			this.commLater(this.errorDelay);
+			this.notifyError("comm", "exception in beforeMessages handler", e);
 		}
-			
+		
+		var commDelay	= null;
 		try {
 			var data	= JSON.parse(text);
 			
@@ -267,12 +269,21 @@ rumms.Conversation.prototype = {
 					self.notifyError("comm", "exception in message handler", e, it);
 				}
 			});
-			this.commLater(this.pollDelay);
+			commDelay	= this.pollDelay;
 		}
 		catch (e) {
 			this.notifyError("comm", "exception in message parser", e, text);
-			this.commLater(this.errorDelay);
+			commDelay	= this.errorDelay;
 		}
+		
+		try {
+			this.context.afterMessages();
+		}
+		catch (e) {
+			this.notifyError("comm", "exception in afterMessages handler", e);
+		}
+		
+		this.commLater(commDelay);
 	},
 	
 	commError: function(exception) {

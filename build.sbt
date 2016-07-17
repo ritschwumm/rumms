@@ -1,6 +1,6 @@
 name			:= "rumms"
 organization	:= "de.djini"
-version			:= "0.133.0"
+version			:= "0.134.0"
 
 scalaVersion	:= "2.11.8"
 scalacOptions	++= Seq(
