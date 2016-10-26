@@ -1,7 +1,7 @@
 package rumms.impl
 
+import scutil.base.implicits._
 import scutil.lang._
-import scutil.implicits._
 
 import scwebapp._
 

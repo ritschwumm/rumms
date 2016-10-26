@@ -1,6 +1,6 @@
 package rumms.impl
 
-import scutil.codec.Charsets
+import scutil.lang.Charsets
 import scutil.time.implicits._
 
 object Constants {
