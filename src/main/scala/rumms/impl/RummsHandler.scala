@@ -124,8 +124,8 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 					json			<- bodyString(request)						toUse (Forbidden,		"unreadable message")
 					data			<- JSONCodec decode json					toUse (Forbidden,		"invalid message")
 					conversationId	<- (data / "conversation").string			toUse (Forbidden,		"conversationId missing")	map ConversationId.apply
-					clientCont		<- (data / "clientCont").long				toUse (Forbidden,		"clientCont missing")
-					serverCont		<- (data / "serverCont").long				toUse (Forbidden,		"serverCont missing")
+					clientCont		<- (data / "clientCont").toLong				toUse (Forbidden,		"clientCont missing")
+					serverCont		<- (data / "serverCont").toLong				toUse (Forbidden,		"serverCont missing")
 					incoming		<- (data / "messages").arraySeq				toUse (Forbidden,		"messages missing")
 					conversation	<- context findConversation conversationId	toUse (Disconnected,	"unknown conversation")
 				}
