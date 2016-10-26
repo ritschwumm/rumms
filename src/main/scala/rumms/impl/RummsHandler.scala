@@ -87,7 +87,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 			params.foldLeft(raw){ (raw, param) =>
 				val (key, value)	= param
 				val pattern			= "@{" + key + "}"
-				val code			= JSONCodec encode value
+				val code			= JSONCodec encodeShort value
 				raw replace (pattern, code)
 			}
 	
@@ -214,7 +214,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				),
 				HttpOutput writeString (
 					Charsets.utf_8,
-					JSONCodec encode json
+					JSONCodec encodeShort json
 				)
 			)
 					
