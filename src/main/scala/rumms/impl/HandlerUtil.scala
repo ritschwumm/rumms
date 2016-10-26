@@ -46,6 +46,6 @@ private object HandlerUtil {
 	
 	implicit class ProblematicOption[W](peer:Option[W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=
-				peer toWin (responder, PlainProblem(text))
+				peer toWin ((responder, PlainProblem(text)))
 	}
 }
