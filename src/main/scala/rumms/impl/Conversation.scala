@@ -6,7 +6,7 @@ import scutil.lang._
 import scutil.time._
 import scutil.log._
 
-import scjson._
+import scjson.ast._
 
 final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extends Logging {
 	//------------------------------------------------------------------------------

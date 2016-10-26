@@ -3,6 +3,7 @@ package rumms.impl
 import scutil.base.implicits._
 import scutil.lang._
 
+import scjson.codec._
 import scwebapp._
 
 private object HandlerUtil {
@@ -32,6 +33,11 @@ private object HandlerUtil {
 	
 	//------------------------------------------------------------------------------
 	//## syntax
+	
+	implicit class ProblematicTriedJSONDecodeFailure[W](peer:Tried[JSONDecodeFailure, W]) {
+		def toUse(responder:HttpResponder, text:String):Action[W]	=
+				peer mapFail { e => (responder, PlainProblem(so"${text}: expected ${e.expectation} at ${e.offset.toString}")) }
+	}
 	
 	implicit class ProblematicTriedException[F<:Exception, W](peer:Tried[F, W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=

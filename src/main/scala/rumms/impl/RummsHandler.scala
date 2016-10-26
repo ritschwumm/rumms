@@ -6,11 +6,11 @@ import scutil.core.implicits._
 import scutil.lang._
 import scutil.log._
 
-import scjson._
+import scjson.ast._
 import scjson.codec._
-import scjson.syntax._
-import scjson.serialization._
-import scjson.JSONNavigation._
+import scjson.pickle.protocol._
+import scjson.pickle.syntax._
+import scjson.ast.JSONNavigation._
 
 import scwebapp._
 import scwebapp.instances._

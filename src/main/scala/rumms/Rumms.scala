@@ -11,7 +11,7 @@ import scutil.log._
 import scwebapp._
 import scwebapp.servlet.implicits._
 
-import scjson._
+import scjson.ast._
 
 import rumms.impl._
 
