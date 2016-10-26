@@ -3,7 +3,7 @@ package impl
 
 import scutil.lang._
 import scutil.implicits._
-import scutil.io.Charsets
+import scutil.codec.Charsets
 import scutil.log._
 
 import scjson._
