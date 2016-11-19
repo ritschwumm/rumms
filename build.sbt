@@ -1,8 +1,8 @@
 name			:= "rumms"
 organization	:= "de.djini"
-version			:= "0.147.0"
+version			:= "0.148.0"
 
-scalaVersion	:= "2.11.8"
+scalaVersion	:= "2.12.0"
 scalacOptions	++= Seq(
 	"-deprecation",
 	"-unchecked",
@@ -21,12 +21,12 @@ scalacOptions	++= Seq(
 
 conflictManager	:= ConflictManager.strict
 libraryDependencies	++= Seq(
-	"de.djini"			%%	"scutil-core"			% "0.91.0"	% "compile",
-	"de.djini"			%%	"scutil-uid"			% "0.91.0"	% "compile",
-	"de.djini"			%%	"scjson-codec"			% "0.100.0"	% "compile",
-	"de.djini"			%%	"scjson-pickle"			% "0.100.0"	% "compile",
-	"de.djini"			%%	"scwebapp-core"			% "0.123.0"	% "compile",
-	"de.djini"			%%	"scwebapp-servlet"		% "0.123.0"	% "compile",
+	"de.djini"			%%	"scutil-core"			% "0.92.0"	% "compile",
+	"de.djini"			%%	"scutil-uid"			% "0.92.0"	% "compile",
+	"de.djini"			%%	"scjson-codec"			% "0.101.0"	% "compile",
+	"de.djini"			%%	"scjson-pickle"			% "0.101.0"	% "compile",
+	"de.djini"			%%	"scwebapp-core"			% "0.124.0"	% "compile",
+	"de.djini"			%%	"scwebapp-servlet"		% "0.124.0"	% "compile",
 	"javax.servlet"		%   "javax.servlet-api"		% "3.1.0"	% "provided"
 )
 

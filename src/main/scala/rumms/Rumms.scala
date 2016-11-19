@@ -47,7 +47,7 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 			new Worker(
 				"conversation publisher",
 				Constants.sendDelay,
-				publishConversations,
+				publishConversations _,
 				ERROR("publishing conversations failed", _)
 			)
 			
