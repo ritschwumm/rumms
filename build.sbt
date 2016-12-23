@@ -1,8 +1,8 @@
 name			:= "rumms"
 organization	:= "de.djini"
-version			:= "0.148.0"
+version			:= "0.149.0"
 
-scalaVersion	:= "2.12.0"
+scalaVersion	:= "2.12.1"
 scalacOptions	++= Seq(
 	"-deprecation",
 	"-unchecked",
@@ -21,17 +21,17 @@ scalacOptions	++= Seq(
 
 conflictManager	:= ConflictManager.strict
 libraryDependencies	++= Seq(
-	"de.djini"			%%	"scutil-core"			% "0.92.0"	% "compile",
-	"de.djini"			%%	"scutil-uid"			% "0.92.0"	% "compile",
-	"de.djini"			%%	"scjson-codec"			% "0.101.0"	% "compile",
-	"de.djini"			%%	"scjson-pickle"			% "0.101.0"	% "compile",
-	"de.djini"			%%	"scwebapp-core"			% "0.124.0"	% "compile",
-	"de.djini"			%%	"scwebapp-servlet"		% "0.124.0"	% "compile",
+	"de.djini"			%%	"scutil-core"			% "0.93.0"	% "compile",
+	"de.djini"			%%	"scutil-uid"			% "0.93.0"	% "compile",
+	"de.djini"			%%	"scjson-codec"			% "0.102.0"	% "compile",
+	"de.djini"			%%	"scjson-pickle"			% "0.102.0"	% "compile",
+	"de.djini"			%%	"scwebapp-core"			% "0.125.0"	% "compile",
+	"de.djini"			%%	"scwebapp-servlet"		% "0.125.0"	% "compile",
 	"javax.servlet"		%   "javax.servlet-api"		% "3.1.0"	% "provided"
 )
 
 wartremoverErrors ++= Seq(
-	Wart.Any2StringAdd,
+	Wart.StringPlusAny,
 	Wart.EitherProjectionPartial,
 	Wart.OptionPartial,
 	Wart.Enumeration,
