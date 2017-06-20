@@ -10,7 +10,7 @@ private object HandlerUtil {
 	//------------------------------------------------------------------------------
 	//## actions
 	
-	type Action[T]	= Tried[(HttpResponder, Problem), T]
+	type Action[T]	= Either[(HttpResponder, Problem), T]
 	
 	def actionLog(action:Action[_]):Option[ISeq[Any]]	=
 			action.swap.toOption map { _._2.loggable }
@@ -34,18 +34,18 @@ private object HandlerUtil {
 	//------------------------------------------------------------------------------
 	//## syntax
 	
-	implicit class ProblematicTriedJSONDecodeFailure[W](peer:Tried[JSONDecodeFailure, W]) {
+	implicit class ProblematicEitherJSONDecodeFailure[W](peer:Either[JSONDecodeFailure, W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=
-				peer mapFail { e => (responder, PlainProblem(so"${text}: expected ${e.expectation} at ${e.offset.toString}")) }
+				peer mapLeft { e => (responder, PlainProblem(so"${text}: expected ${e.expectation} at ${e.offset.toString}")) }
 	}
 	
-	implicit class ProblematicTriedException[F<:Exception, W](peer:Tried[F, W]) {
+	implicit class ProblematicEitherException[F<:Exception, W](peer:Either[F, W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=
-				peer mapFail { e => (responder, ExceptionProblem(text, e)) }
+				peer mapLeft { e => (responder, ExceptionProblem(text, e)) }
 	}
 	
 	implicit class ProblematicOption[W](peer:Option[W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=
-				peer toWin ((responder, PlainProblem(text)))
+				peer toRight ((responder, PlainProblem(text)))
 	}
 }

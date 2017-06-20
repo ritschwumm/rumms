@@ -72,7 +72,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				getClass.getClassLoader.resources
 				.readBytes	(resource)
 				.getOrError (so"cannot read resource ${resource}")
-				.into		(Constants.encoding.decodeTried)
+				.into		(Constants.encoding.decodeEither)
 				.getOrError (so"cannot decode resource value")
 		configure(raw, Map(
 			"VERSION"			-> JSONString(serverVersion),
@@ -174,7 +174,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 		actionResponder(action)
 	}
 	
-	private def bodyString(request:HttpRequest):Tried[Exception,String]	=
+	private def bodyString(request:HttpRequest):Either[Exception,String]	=
 			Catch.exception in (request.body readString Constants.encoding)
 	
 	//------------------------------------------------------------------------------
