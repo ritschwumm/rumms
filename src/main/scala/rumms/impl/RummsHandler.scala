@@ -182,7 +182,6 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	
 	private val CONNECTED_TEXT		= "OK"
 	private val DISCONNECTED_TEXT	= "CONNECT"
-	private val UPLOADED_TEXT		= "OK"
 	private val UPGRADED_TEXT		= "VERSION"
 	
 	private val Forbidden:HttpResponder		=
