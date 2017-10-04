@@ -77,7 +77,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	def maybePublish() {
 		synchronized {
 			(MilliInstant.now - lastAppend >= Constants.sendDelay) &&
-			entries.nonEmpty flatGuard {
+			entries.nonEmpty flatOption {
 				val out	= publishers
 				publishers	= None
 				out

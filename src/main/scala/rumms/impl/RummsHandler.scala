@@ -42,7 +42,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 			
 	private def subHandler(method:HttpMethod, subPath:String, handler:HttpHandler):HttpPHandler	=
 			req => {
-				(req.fullPathUTF8 exists (_ ==== configuration.path + subPath)) guard {
+				(req.fullPathUTF8 exists (_ ==== configuration.path + subPath)) option {
 					if (req.method.toOption == Some(method)) {
 						try {
 							context.expireConversations()
