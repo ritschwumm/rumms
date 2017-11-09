@@ -139,11 +139,13 @@ rumms.Conversation.prototype = {
 		
 		var	client	= new XMLHttpRequest();
 		client.open("POST", this.servletPrefix + "/comm?_=", true);
+		client.onerror		= function(ev) { console.debug("commLoop error", ev);	};
+		client.ontimeout	= function(ev) { console.debug("commLoop timeout", ev);	};
 		client.onreadystatechange = function() {
 			if (client.readyState !== 4)	return;
 			
 			clearTimeout(timer);
-			this.commAbortFunc	= null;
+			self.commAbortFunc	= null;
 			
 			// a forced abort occurs if someone needs to send messages immediately
 			if (forcedAbort) {
