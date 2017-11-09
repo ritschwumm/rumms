@@ -31,7 +31,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 			synchronized {
 				// TODO how can it happen that requests overtake each other?
 				if (clientCont < lastClientCont) {
-					WARN(so"clientCont: ${lastClientCont.toString}->${clientCont.toString}")
+					WARN(show"clientCont: ${lastClientCont}->${clientCont}")
 					return
 				}
 				val expected	= (clientCont - lastClientCont)
@@ -51,9 +51,9 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	
 	private var	nextId	= 0
 	
-	private var	entries:Vector[Entry]	= Vector.empty
-	private var publishers:Option[Task]	= None
-	private var lastAppend:MilliInstant	= MilliInstant.now
+	private var	entries:Vector[Entry]			= Vector.empty
+	private var publishers:Option[Thunk[Unit]]	= None
+	private var lastAppend:MilliInstant			= MilliInstant.now
 	
 	/** server -> client */
 	def appendOutgoing(message:JsonValue):Unit	=
@@ -90,7 +90,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	}
 	
 	/** used by the webserver to be notified there is data to fetch */
-	def onHasOutgoing(publisher:Task):Unit =
+	def onHasOutgoing(publisher:Thunk[Unit]):Unit =
 			synchronized {
 				// NOTE if there already is an expired continuation, it is silently overwritten
 				publishers	= Some(publisher)
