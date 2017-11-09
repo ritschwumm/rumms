@@ -26,7 +26,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 			callbacks conversationAlive id
 	
 	/** client -> server */
-	def handleIncoming(incoming:ISeq[JSONValue], clientCont:Long):Unit	=
+	def handleIncoming(incoming:ISeq[JsonValue], clientCont:Long):Unit	=
 			// after an aborted request there may be messages in incoming already seen before
 			synchronized {
 				// TODO how can it happen that requests overtake each other?
@@ -47,7 +47,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	//------------------------------------------------------------------------------
 	//## server -> client
 	
-	private case class Entry(id:Long, message:JSONValue)
+	private case class Entry(id:Long, message:JsonValue)
 	
 	private var	nextId	= 0
 	
@@ -56,7 +56,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	private var lastAppend:MilliInstant	= MilliInstant.now
 	
 	/** server -> client */
-	def appendOutgoing(message:JSONValue):Unit	=
+	def appendOutgoing(message:JsonValue):Unit	=
 			synchronized {
 				val entry	= Entry(nextId, message)
 				nextId		+= 1

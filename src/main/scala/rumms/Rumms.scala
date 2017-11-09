@@ -85,7 +85,7 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 			(conversations.get map { _.id }).toSet
 	
 	/** send a message to a Conversation, returns success */
-	def sendMessage(receiver:ConversationId, message:JSONValue):Boolean	=
+	def sendMessage(receiver:ConversationId, message:JsonValue):Boolean	=
 			findConversation(receiver)
 			.someEffect	{ _ appendOutgoing message }
 			.isDefined

@@ -10,7 +10,7 @@ import scjson.ast._
 import scjson.codec._
 import scjson.pickle.protocol._
 import scjson.pickle.syntax._
-import scjson.ast.JSONNavigation._
+import scjson.ast.JsonNavigation._
 
 import scwebapp._
 import scwebapp.instances._
@@ -75,19 +75,19 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				.into		(Constants.encoding.decodeEither)
 				.getOrError (so"cannot decode resource value")
 		configure(raw, Map(
-			"VERSION"			-> JSONString(serverVersion),
-			"ENCODING"			-> JSONString(Constants.encoding.name),
-			"CLIENT_TTL"		-> JSONNumber(Constants.clientTTL.millis),
-			"SERVLET_PREFIX"	-> JSONString(servletPrefix)
+			"VERSION"			-> JsonString(serverVersion),
+			"ENCODING"			-> JsonString(Constants.encoding.name),
+			"CLIENT_TTL"		-> JsonNumber(Constants.clientTTL.millis),
+			"SERVLET_PREFIX"	-> JsonString(servletPrefix)
 		))
 	}
 	
 	/** patch raw code by replacing @{id} tags */
-	private def configure(raw:String, params:Map[String,JSONValue]):String =
+	private def configure(raw:String, params:Map[String,JsonValue]):String =
 			params.foldLeft(raw){ (raw, param) =>
 				val (key, value)	= param
 				val pattern			= "@{" + key + "}"
-				val code			= JSONCodec encodeShort value
+				val code			= JsonCodec encodeShort value
 				raw replace (pattern, code)
 			}
 	
@@ -101,7 +101,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	
 	/** establish a new Conversation */
 	private def hi(request:HttpRequest):HttpResponder	= {
-		// BETTER send JSON data here
+		// BETTER send Json data here
 		val action:Action[HttpResponder]	=
 				for {
 					clientVersion	<- bodyString(request)	toUse (Forbidden,	"unreadable message")
@@ -122,7 +122,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 		val action:Action[HttpResponder]	=
 				for {
 					json			<- bodyString(request)						toUse (Forbidden,		"unreadable message")
-					data			<- JSONCodec decode json					toUse (Forbidden,		"invalid message")
+					data			<- JsonCodec decode json					toUse (Forbidden,		"invalid message")
 					conversationId	<- (data / "conversation").string			toUse (Forbidden,		"conversationId missing")	map ConversationId.apply
 					clientCont		<- (data / "clientCont").toLong				toUse (Forbidden,		"clientCont missing")
 					serverCont		<- (data / "serverCont").toLong				toUse (Forbidden,		"serverCont missing")
@@ -204,7 +204,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 		
 	//------------------------------------------------------------------------------
 
-	private def JsonOK(json:JSONValue):HttpResponse	=
+	private def JsonOK(json:JsonValue):HttpResponse	=
 			HttpResponse(
 				OK,	None,
 				NoCache ++
@@ -213,7 +213,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				),
 				HttpOutput writeString (
 					Charsets.utf_8,
-					JSONCodec encodeShort json
+					JsonCodec encodeShort json
 				)
 			)
 					

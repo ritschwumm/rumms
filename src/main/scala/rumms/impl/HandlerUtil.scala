@@ -34,7 +34,7 @@ private object HandlerUtil {
 	//------------------------------------------------------------------------------
 	//## syntax
 	
-	implicit class ProblematicEitherJSONDecodeFailure[W](peer:Either[JSONDecodeFailure, W]) {
+	implicit class ProblematicEitherJsonDecodeFailure[W](peer:Either[JsonDecodeFailure, W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=
 				peer mapLeft { e => (responder, PlainProblem(so"${text}: expected ${e.expectation} at ${e.offset.toString}")) }
 	}

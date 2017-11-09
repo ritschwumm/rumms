@@ -13,5 +13,5 @@ trait RummsCallbacks {
 	def conversationAlive(conversationId:ConversationId):Unit
 	
 	/** the browser sent a message to us */
-	def messageReceived(conversationId:ConversationId, message:JSONValue):Unit
+	def messageReceived(conversationId:ConversationId, message:JsonValue):Unit
 }
