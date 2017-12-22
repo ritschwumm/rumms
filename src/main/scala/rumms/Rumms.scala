@@ -116,5 +116,5 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 			conversations.get find { _.id ==== id }
 		
 	private def nextConversationId():ConversationId	=
-			ConversationId(UidPrisms.String put uidGenerator.next)
+			ConversationId(UidPrisms.String set uidGenerator.next)
 }
