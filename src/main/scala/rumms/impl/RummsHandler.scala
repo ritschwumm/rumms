@@ -70,10 +70,10 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 		val resource	= "rumms/Client.js"
 		val raw	=
 				getClass.getClassLoader.resourceProvider
-				.readBytes	(resource)
-				.getOrError (show"cannot read resource ${resource}")
-				.into		(Constants.encoding.decodeEither)
-				.getOrError (show"cannot decode resource value")
+				.readByteString	(resource)
+				.getOrError 	(show"cannot read resource ${resource}")
+				.into			(Constants.encoding.decodeEitherByteString)
+				.getOrError 	(show"cannot decode resource value")
 		configure(raw, Map(
 			"VERSION"			-> JsonString(serverVersion),
 			"ENCODING"			-> JsonString(Constants.encoding.name),

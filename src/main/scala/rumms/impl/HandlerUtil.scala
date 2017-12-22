@@ -2,6 +2,7 @@ package rumms.impl
 
 import scutil.base.implicits._
 import scutil.lang._
+import scutil.log._
 
 import scjson.codec._
 import scwebapp._
@@ -12,8 +13,8 @@ private object HandlerUtil {
 	
 	type Action[T]	= Either[(HttpResponder, Problem), T]
 	
-	def actionLog(action:Action[_]):Option[ISeq[Any]]	=
-			action.swap.toOption map { _._2.loggable }
+	def actionLog(action:Action[_]):Option[ISeq[LogValue]]	=
+			action.swap.toOption map { _._2.logValue }
 		
 	def actionResponder(action:Action[HttpResponder]):HttpResponder	=
 			action cata (_._1, identity)
@@ -22,13 +23,13 @@ private object HandlerUtil {
 	//## problems
 	
 	sealed trait Problem {
-		def loggable:ISeq[Any]
+		def logValue:ISeq[LogValue]
 	}
 	final case class PlainProblem(message:String) extends Problem {
-		def loggable:ISeq[Any]	= ISeq(message)
+		def logValue:ISeq[LogValue]	= ISeq(LogString(message))
 	}
 	final case class ExceptionProblem(message:String, exception:Exception) extends Problem {
-		def loggable:ISeq[Any]	= ISeq(message, exception)
+		def logValue:ISeq[LogValue]	= ISeq(LogString(message), LogThrowable(exception))
 	}
 	
 	//------------------------------------------------------------------------------
