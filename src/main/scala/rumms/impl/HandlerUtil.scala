@@ -37,12 +37,12 @@ private object HandlerUtil {
 	
 	implicit class ProblematicEitherJsonDecodeFailure[W](peer:Either[JsonDecodeFailure, W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=
-				peer mapLeft { e => (responder, PlainProblem(show"${text}: expected ${e.expectation} at ${e.offset}")) }
+				peer leftMap { e => (responder, PlainProblem(show"${text}: expected ${e.expectation} at ${e.offset}")) }
 	}
 	
 	implicit class ProblematicEitherException[F<:Exception, W](peer:Either[F, W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=
-				peer mapLeft { e => (responder, ExceptionProblem(text, e)) }
+				peer leftMap { e => (responder, ExceptionProblem(text, e)) }
 	}
 	
 	implicit class ProblematicOption[W](peer:Option[W]) {
