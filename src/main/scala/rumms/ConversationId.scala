@@ -6,4 +6,4 @@ object ConversationId {
 }
 */
 
-final case class ConversationId(idval:String)
+final case class ConversationId(value:String)

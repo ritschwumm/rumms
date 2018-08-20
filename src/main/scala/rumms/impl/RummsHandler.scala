@@ -7,10 +7,10 @@ import scutil.lang._
 import scutil.log._
 
 import scjson.ast._
+import scjson.ast.JsonNavigation._
 import scjson.codec._
 import scjson.pickle.protocol._
 import scjson.pickle.syntax._
-import scjson.ast.JsonNavigation._
 
 import scwebapp._
 import scwebapp.instances._
@@ -191,7 +191,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 			HttpResponder(StringOK(code, text_javascript))
 	
 	private def Connected(conversationId:ConversationId):HttpResponder	=
-			SendPlainTextCharset(CONNECTED_TEXT + " " + conversationId.idval)
+			SendPlainTextCharset(CONNECTED_TEXT + " " + conversationId.value)
 			
 	private def Upgrade:HttpResponder	=
 			SendPlainTextCharset(UPGRADED_TEXT + " " + serverVersion)
