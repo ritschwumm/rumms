@@ -10,7 +10,6 @@ object Constants {
 	val clientTTL		= continuationTTL	*! 2
 	val conversationTTL	= clientTTL			*! 3
 	val sendDelay		= 100.millis
-	val secureIds		= true
 	
 	object paths {
 		val code	= "/code"

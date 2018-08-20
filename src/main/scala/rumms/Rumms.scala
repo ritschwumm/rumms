@@ -4,7 +4,7 @@ import javax.servlet.ServletContext
 
 import scutil.base.implicits._
 import scutil.lang._
-import scutil.uid._
+import scutil.guid.Guid
 import scutil.worker._
 import scutil.log._
 
@@ -34,7 +34,6 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 	private var callbacks:RummsCallbacks	= null
 	private val conversations:Synchronized[ISeq[Conversation]]	= Synchronized(Vector.empty)
 	
-	private val uidGenerator	= new UidGenerator(Constants.secureIds)
 	private val rummsHandler	= new RummsHandler(configuration, new RummsHandlerContext{
 		def createConversation():ConversationId							= outer.createConversation()
 		def expireConversations():Unit									= outer.expireConversations()
@@ -116,5 +115,5 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 			conversations.get find { _.id ==== id }
 		
 	private def nextConversationId():ConversationId	=
-			ConversationId(UidPrisms.String set uidGenerator.next)
+			ConversationId(Guid.fresh())
 }
