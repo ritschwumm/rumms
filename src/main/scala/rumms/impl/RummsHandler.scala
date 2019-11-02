@@ -207,7 +207,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	private def JsonOK(json:JsonValue):HttpResponse	=
 			HttpResponse(
 				OK,	None,
-				NoCache ++
+				DisableCaching ++
 				HeaderValues(
 					ContentType(application_json)
 				),
@@ -220,7 +220,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	private def StringOK(text:String, contentType:MimeType):HttpResponse	=
 			HttpResponse(
 				OK,	None,
-				NoCache ++
+				DisableCaching ++
 				HeaderValues(
 					ContentType(contentType addParameter ("charset",  Constants.encoding.name))
 				),
@@ -230,7 +230,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	private def EmptyStatus(status:HttpStatus):HttpResponse	=
 			HttpResponse(
 				status,	None,
-				NoCache,
+				DisableCaching,
 				HttpOutput.empty
 			)
 }
