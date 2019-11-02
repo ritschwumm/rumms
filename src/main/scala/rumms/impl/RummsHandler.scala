@@ -24,22 +24,22 @@ import rumms.impl.HandlerUtil._
 /** mount this with an url-pattern of <configuration.path>/STAR (where STAR is a literal "*") */
 final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerContext) extends Logging {
 	import Constants.paths
-	
+
 	private val serverVersion	=
 			Constants.version.toString + "/" + configuration.version
-		
+
 	//------------------------------------------------------------------------------
 	//## request handling
-	
+
 	lazy val totalPlan:HttpHandler	=
 			partialPlan	orAlways
 			constant(HttpResponder(EmptyStatus(NOT_FOUND)))
-			
+
 	lazy val partialPlan:HttpPHandler	=
 			subHandler(GET,		paths.code,	code)	orElse
 			subHandler(POST,	paths.hi,	hi)		orElse
 			subHandler(POST,	paths.comm,	comm)
-			
+
 	private def subHandler(method:HttpMethod, subPath:String, handler:HttpHandler):HttpPHandler	=
 			req => {
 				(req.fullPathUTF8 exists (_ ==== configuration.path + subPath)) option {
@@ -56,16 +56,16 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 					else HttpResponder(EmptyStatus(METHOD_NOT_ALLOWED))
 				}
 			}
-	
+
 	//------------------------------------------------------------------------------
 	//## code transfer
-	
+
 	/** send javascript code for client configuration */
 	private def code(request:HttpRequest):HttpResponder	= {
 		val servletPrefix	= request.contextPath + configuration.path
 		ClientCode(clientCode(servletPrefix))
 	}
-		
+
 	private def clientCode(servletPrefix:String):String	= {
 		val resource	= "rumms/Client.js"
 		val raw	=
@@ -81,7 +81,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 			"SERVLET_PREFIX"	-> JsonString(servletPrefix)
 		))
 	}
-	
+
 	/** patch raw code by replacing @{id} tags */
 	private def configure(raw:String, params:Map[String,JsonValue]):String =
 			params.foldLeft(raw){ (raw, param) =>
@@ -90,15 +90,15 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				val code			= JsonCodec encodeShort value
 				raw replace (pattern, code)
 			}
-	
+
 	//------------------------------------------------------------------------------
 	//## message transfer
-	
+
 	private object MyProtocol
 			extends	NativeProtocol
 			with	ISeqProtocol
 			with	IdentityProtocol
-	
+
 	/** establish a new Conversation */
 	private def hi(request:HttpRequest):HttpResponder	= {
 		// BETTER send Json data here
@@ -110,15 +110,15 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 					Upgrade,
 					Connected(context.createConversation())
 				)
-					
+
 		actionLog(action) foreach { ERROR(_:_*) }
 		actionResponder(action)
 	}
-	
+
 	/** receive and send messages for a single Conversation */
 	private def comm(request:HttpRequest):HttpResponder	= {
 		import MyProtocol._
-		
+
 		val action:Action[HttpResponder]	=
 				for {
 					json			<- bodyString(request)						toUse (Forbidden,		"unreadable message")
@@ -131,13 +131,13 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				}
 				yield {
 					conversation.touch()
-					
+
 					// tell the client it's alive
 					conversation.handleHeartbeat()
-					
+
 					// give new messages to the client
 					conversation handleIncoming (incoming, clientCont)
-					
+
 					def compileResponse(batch:Batch):HttpResponse =
 							JsonOK(
 								jsonObject(
@@ -146,7 +146,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 									"messages"		-> batch.messages
 								)
 							)
-						
+
 					// maybe there already are new messages, if not, we have to wait
 					val fromConversation	= conversation fetchOutgoing serverCont
 					if (fromConversation.messages.nonEmpty || incoming.nonEmpty) {
@@ -169,39 +169,39 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 						responder
 					}
 				}
-				
+
 		actionLog(action) foreach { ERROR(_:_*) }
 		actionResponder(action)
 	}
-	
+
 	private def bodyString(request:HttpRequest):Either[Exception,String]	=
 			Catch.exception in (request.body readString Constants.encoding)
-	
+
 	//------------------------------------------------------------------------------
 	//## helper
-	
+
 	private val CONNECTED_TEXT		= "OK"
 	private val DISCONNECTED_TEXT	= "CONNECT"
 	private val UPGRADED_TEXT		= "VERSION"
-	
+
 	private val Forbidden:HttpResponder		=
 			HttpResponder(EmptyStatus(FORBIDDEN))
-	
+
 	private def ClientCode(code:String):HttpResponder	=
 			HttpResponder(StringOK(code, text_javascript))
-	
+
 	private def Connected(conversationId:ConversationId):HttpResponder	=
 			SendPlainTextCharset(CONNECTED_TEXT + " " + conversationId.value)
-			
+
 	private def Upgrade:HttpResponder	=
 			SendPlainTextCharset(UPGRADED_TEXT + " " + serverVersion)
-	
+
 	private val Disconnected:HttpResponder	=
 			SendPlainTextCharset(DISCONNECTED_TEXT)
-			
+
 	private def SendPlainTextCharset(s:String):HttpResponder	=
 			HttpResponder(StringOK(s, text_plain))
-		
+
 	//------------------------------------------------------------------------------
 
 	private def JsonOK(json:JsonValue):HttpResponse	=
@@ -216,7 +216,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 					JsonCodec encodeShort json
 				)
 			)
-					
+
 	private def StringOK(text:String, contentType:MimeType):HttpResponse	=
 			HttpResponse(
 				OK,	None,
@@ -226,7 +226,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				),
 				HttpOutput writeString (Constants.encoding, text)
 			)
-			
+
 	private def EmptyStatus(status:HttpStatus):HttpResponse	=
 			HttpResponse(
 				status,	None,

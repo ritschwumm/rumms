@@ -3,7 +3,7 @@ package rumms
 final case class RummsConfiguration(
 	// where the servlet is mounted
 	path:String,
-	
+
 	// used for client-side version checking
 	version:String
 ) {

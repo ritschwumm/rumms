@@ -2,7 +2,7 @@ package rumms
 
 /*
 object ConversationId {
-	val newType	= Bijector[ConversationId]	
+	val newType	= Bijector[ConversationId]
 }
 */
 
