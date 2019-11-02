@@ -1,8 +1,8 @@
 name			:= "rumms"
 organization	:= "de.djini"
-version			:= "0.232.0"
+version			:= "0.233.0"
 
-scalaVersion	:= "2.12.9"
+scalaVersion	:= "2.13.1"
 scalacOptions	++= Seq(
 	"-deprecation",
 	"-unchecked",
@@ -11,7 +11,6 @@ scalacOptions	++= Seq(
 	// "-language:higherKinds",
 	// "-language:reflectiveCalls",
 	// "-language:dynamics",
-	// "-language:postfixOps",
 	// "-language:experimental.macros"
 	"-feature",
 	"-Xfatal-warnings",
@@ -20,12 +19,12 @@ scalacOptions	++= Seq(
 
 conflictManager		:= ConflictManager.strict withOrganization "^(?!(org\\.scala-lang|org\\.scala-js)(\\..*)?)$"
 libraryDependencies	++= Seq(
-	"de.djini"			%%	"scutil-core"		% "0.159.0"	% "compile",
-	"de.djini"			%%	"scutil-guid"		% "0.159.0"	% "compile",
-	"de.djini"			%%	"scjson-codec"		% "0.177.0"	% "compile",
-	"de.djini"			%%	"scjson-pickle"		% "0.177.0"	% "compile",
-	"de.djini"			%%	"scwebapp-core"		% "0.203.0"	% "compile",
-	"de.djini"			%%	"scwebapp-servlet"	% "0.203.0"	% "compile",
+	"de.djini"			%%	"scutil-core"		% "0.161.0"	% "compile",
+	"de.djini"			%%	"scutil-guid"		% "0.161.0"	% "compile",
+	"de.djini"			%%	"scjson-codec"		% "0.179.0"	% "compile",
+	"de.djini"			%%	"scjson-pickle"		% "0.179.0"	% "compile",
+	"de.djini"			%%	"scwebapp-core"		% "0.205.0"	% "compile",
+	"de.djini"			%%	"scwebapp-servlet"	% "0.205.0"	% "compile",
 	"javax.servlet"		%   "javax.servlet-api"	% "3.1.0"	% "provided"
 )
 

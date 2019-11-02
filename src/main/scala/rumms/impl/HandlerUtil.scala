@@ -29,7 +29,7 @@ private object HandlerUtil {
 		def logValue:ISeq[LogValue]	= ISeq(LogString(message))
 	}
 	final case class ExceptionProblem(message:String, exception:Exception) extends Problem {
-		def logValue:ISeq[LogValue]	= ISeq(LogString(message), LogThrowable(exception))
+		def logValue:ISeq[LogValue]	= ISeq[LogValue](LogString(message), LogThrowable(exception))
 	}
 
 	//------------------------------------------------------------------------------

@@ -74,7 +74,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				.getOrError 	(show"cannot read resource ${resource}")
 				.into			(Constants.encoding.decodeEitherByteString)
 				.getOrError 	(show"cannot decode resource value")
-		configure(raw, Map(
+		configure(raw, Map[String,JsonValue](
 			"VERSION"			-> JsonString(serverVersion),
 			"ENCODING"			-> JsonString(Constants.encoding.name),
 			"CLIENT_TTL"		-> JsonNumber(Constants.clientTTL.millis),

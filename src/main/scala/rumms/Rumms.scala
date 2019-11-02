@@ -58,7 +58,7 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 	/** relative to the webapp's context */
 	val codePath:String	= (configuration.path substring 1) + Constants.paths.code + "?_="
 
-	def start(callbacks:RummsCallbacks) {
+	def start(callbacks:RummsCallbacks):Unit	= {
 		require(this.callbacks == null, "rumms application is already started")
 
 		this.callbacks	= callbacks
@@ -69,7 +69,7 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 		INFO("running")
 	}
 
-	def dispose() {
+	def dispose():Unit	= {
 		DEBUG("destroying send worker")
 
 		sendWorker.dispose()
@@ -100,15 +100,15 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 		conversationId
 	}
 
-	private def expireConversations() {
+	private def expireConversations():Unit	= {
 		conversations
 		.modify		(State(_  partition { _.alive }))
 		.map		{ _.id }
 		.foreach	(callbacks.conversationRemoved)
 	}
 
-	private def publishConversations() {
-		conversations.get foreach { _ maybePublish () }
+	private def publishConversations():Unit	= {
+		conversations.get foreach { _.maybePublish() }
 	}
 
 	private def findConversation(id:ConversationId):Option[Conversation]	=

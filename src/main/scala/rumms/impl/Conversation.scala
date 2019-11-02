@@ -15,7 +15,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	@volatile
 	private var touched:MilliInstant	= MilliInstant.now
 	def alive:Boolean	= touched +! Constants.conversationTTL > MilliInstant.now
-	def touch()			{ touched = MilliInstant.now }
+	def touch():Unit	= { touched = MilliInstant.now }
 
 	//------------------------------------------------------------------------------
 	//## client -> server
@@ -74,7 +74,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 
 	// NOTE was done directly in appendOutgoing and is now done in a worker thread
 	// to give the queue a chance to grow a little bit before sending
-	def maybePublish() {
+	def maybePublish():Unit	= {
 		synchronized {
 			(MilliInstant.now - lastAppend >= Constants.sendDelay) &&
 			entries.nonEmpty flatOption {
