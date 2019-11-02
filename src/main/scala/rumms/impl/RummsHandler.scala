@@ -96,7 +96,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 
 	private object MyProtocol
 			extends	NativeProtocol
-			with	ISeqProtocol
+			with	SeqProtocol
 			with	IdentityProtocol
 
 	/** establish a new Conversation */

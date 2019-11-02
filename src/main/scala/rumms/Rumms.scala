@@ -32,7 +32,7 @@ object Rumms {
 final class Rumms(configuration:RummsConfiguration) extends Disposable with Logging { outer =>
 	@volatile
 	private var callbacks:RummsCallbacks	= null
-	private val conversations:Synchronized[ISeq[Conversation]]	= Synchronized(Vector.empty)
+	private val conversations:Synchronized[Seq[Conversation]]	= Synchronized(Vector.empty)
 
 	private val rummsHandler	= new RummsHandler(configuration, new RummsHandlerContext{
 		def createConversation():ConversationId							= outer.createConversation()
