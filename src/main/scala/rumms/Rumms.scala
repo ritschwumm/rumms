@@ -43,12 +43,12 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 	private val mountPath:String		= configuration.path + "/*"
 
 	private val sendWorker	=
-			new Worker(
-				"conversation publisher",
-				Constants.sendDelay,
-				publishConversations _,
-				ERROR("publishing conversations failed", _)
-			)
+		new Worker(
+			"conversation publisher",
+			Constants.sendDelay,
+			publishConversations _,
+			ERROR("publishing conversations failed", _)
+		)
 
 	//------------------------------------------------------------------------------
 	//## public interface
@@ -81,13 +81,13 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 
 	/** ids of currently active Conversations */
 	def conversationIds:Set[ConversationId]	=
-			(conversations.get map { _.id }).toSet
+		(conversations.get map { _.id }).toSet
 
 	/** send a message to a Conversation, returns success */
 	def sendMessage(receiver:ConversationId, message:JsonValue):Boolean	=
-			findConversation(receiver)
-			.someEffect	{ _ appendOutgoing message }
-			.isDefined
+		findConversation(receiver)
+		.someEffect	{ _ appendOutgoing message }
+		.isDefined
 
 	//------------------------------------------------------------------------------
 	//## eonversations
@@ -102,7 +102,7 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 
 	private def expireConversations():Unit	= {
 		conversations
-		.modify		(State(_  partition { _.alive }))
+		.modify		(State(_  partition { _.alive() }))
 		.map		{ _.id }
 		.foreach	(callbacks.conversationRemoved)
 	}
@@ -112,8 +112,8 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 	}
 
 	private def findConversation(id:ConversationId):Option[Conversation]	=
-			conversations.get find { _.id ==== id }
+		conversations.get find { _.id ==== id }
 
 	private def nextConversationId():ConversationId	=
-			ConversationId(Guid.fresh())
+		ConversationId(Guid.fresh())
 }

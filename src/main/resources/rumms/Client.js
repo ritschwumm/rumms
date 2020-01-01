@@ -68,6 +68,8 @@ rumms.Conversation.prototype = {
 
 		var	client	= new XMLHttpRequest();
 		client.open("POST", this.servletPrefix + "/hi?_=", true);
+		client.onerror		= function(ev) { console.debug("hiLoop error", ev);		};
+		client.ontimeout	= function(ev) { console.debug("hiLoop timeout", ev);	};
 		client.onreadystatechange = function() {
 			if (client.readyState !== 4)	return;
 			clearTimeout(timer);

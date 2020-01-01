@@ -13,10 +13,10 @@ private object HandlerUtil {
 	type Action[T]	= Either[(HttpResponder, Problem), T]
 
 	def actionLog(action:Action[_]):Option[Seq[LogValue]]	=
-			action.swap.toOption map { _._2.logValue }
+		action.swap.toOption map { _._2.logValue }
 
 	def actionResponder(action:Action[HttpResponder]):HttpResponder	=
-			action cata (_._1, identity)
+		action cata (_._1, identity)
 
 	//------------------------------------------------------------------------------
 	//## problems
@@ -36,16 +36,16 @@ private object HandlerUtil {
 
 	implicit class ProblematicEitherJsonDecodeFailure[W](peer:Either[JsonDecodeFailure, W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=
-				peer leftMap { e => (responder, PlainProblem(show"${text}: expected ${e.expectation} at ${e.offset}")) }
+			peer leftMap { e => (responder, PlainProblem(show"${text}: expected ${e.expectation} at ${e.offset}")) }
 	}
 
 	implicit class ProblematicEitherException[F<:Exception, W](peer:Either[F, W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=
-				peer leftMap { e => (responder, ExceptionProblem(text, e)) }
+			peer leftMap { e => (responder, ExceptionProblem(text, e)) }
 	}
 
 	implicit class ProblematicOption[W](peer:Option[W]) {
 		def toUse(responder:HttpResponder, text:String):Action[W]	=
-				peer toRight ((responder, PlainProblem(text)))
+			peer toRight ((responder, PlainProblem(text)))
 	}
 }
