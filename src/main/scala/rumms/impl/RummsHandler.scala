@@ -9,8 +9,8 @@ import scutil.log._
 import scjson.ast._
 import scjson.ast.JsonNavigation._
 import scjson.codec._
-import scjson.pickle.protocol._
-import scjson.pickle.syntax._
+import scjson.converter._
+import scjson.converter.syntax._
 
 import scwebapp._
 import scwebapp.instances._
@@ -94,10 +94,8 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	//------------------------------------------------------------------------------
 	//## message transfer
 
-	private object MyProtocol
-		extends	NativeProtocol
-		with	SeqProtocol
-		with	IdentityProtocol
+	private object MyWriters
+		extends	JsonWriters
 
 	/** establish a new Conversation */
 	private def hi(request:HttpRequest):HttpResponder	= {
@@ -117,7 +115,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 
 	/** receive and send messages for a single Conversation */
 	private def comm(request:HttpRequest):HttpResponder	= {
-		import MyProtocol._
+		import MyWriters._
 
 		val action:Action[HttpResponder]	=
 			for {
@@ -138,14 +136,21 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				// give new messages to the client
 				conversation handleIncoming (incoming, clientCont)
 
-				def compileResponse(batch:Batch):HttpResponse =
-					JsonOK(
+				def compileResponse(batch:Batch):HttpResponse = {
+					val json	=
 						jsonObject(
 							"clientCont"	-> clientCont,
 							"serverCont"	-> batch.serverCont,
 							"messages"		-> batch.messages
 						)
-					)
+					json match {
+						case Good(x)		=>
+							JsonOK(x)
+						case Bad(errors)	=>
+							ERROR("json creation failed", LogValue multiple errors.toSeq.map(LogValue.string))
+							EmptyStatus(INTERNAL_SERVER_ERROR)
+					}
+				}
 
 				// maybe there already are new messages, if not, we have to wait
 				val fromConversation	= conversation fetchOutgoing serverCont
