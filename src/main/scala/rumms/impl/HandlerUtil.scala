@@ -25,10 +25,10 @@ private object HandlerUtil {
 		def logValue:Seq[LogValue]
 	}
 	final case class PlainProblem(message:String) extends Problem {
-		def logValue:Seq[LogValue]	= Seq(LogString(message))
+		def logValue:Seq[LogValue]	= Seq(LogValue.string(message))
 	}
 	final case class ExceptionProblem(message:String, exception:Exception) extends Problem {
-		def logValue:Seq[LogValue]	= Seq[LogValue](LogString(message), LogThrowable(exception))
+		def logValue:Seq[LogValue]	= Seq[LogValue](LogValue.string(message), LogValue.throwable(exception))
 	}
 
 	//------------------------------------------------------------------------------
