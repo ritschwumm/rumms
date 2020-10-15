@@ -147,7 +147,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 						case Good(x)		=>
 							JsonOK(x)
 						case Bad(errors)	=>
-							ERROR("json creation failed", LogValue multiple errors.toSeq.map(LogValue.string))
+							ERROR("json creation failed", errors)
 							EmptyStatus(INTERNAL_SERVER_ERROR)
 					}
 				}
