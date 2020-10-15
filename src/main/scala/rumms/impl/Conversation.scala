@@ -41,7 +41,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 			incoming drop (count-relevant)
 		}
 		.foreach { it =>
-			callbacks messageReceived (id, it)
+			callbacks.messageReceived(id, it)
 		}
 
 	//------------------------------------------------------------------------------

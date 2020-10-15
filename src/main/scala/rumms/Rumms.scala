@@ -19,7 +19,7 @@ object Rumms {
 	/** must be called from a ServletContextListener.contextInitialized method */
 	def create(sc:ServletContext, configuration:RummsConfiguration):Rumms	= {
 		new Rumms(configuration) doto { rumms =>
-			sc mount (
+			sc.mount(
 				name			= "RummsServlet",
 				handler			= rumms.httpHandler,
 				mappings		= Vector(rumms.mountPath),
@@ -81,7 +81,7 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 
 	/** ids of currently active Conversations */
 	def conversationIds:Set[ConversationId]	=
-		(conversations.get map { _.id }).toSet
+		(conversations.get() map { _.id }).toSet
 
 	/** send a message to a Conversation, returns success */
 	def sendMessage(receiver:ConversationId, message:JsonValue):Boolean	=
@@ -108,11 +108,11 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 	}
 
 	private def publishConversations():Unit	= {
-		conversations.get foreach { _.maybePublish() }
+		conversations.get() foreach { _.maybePublish() }
 	}
 
 	private def findConversation(id:ConversationId):Option[Conversation]	=
-		conversations.get find { _.id ==== id }
+		conversations.get() find { _.id ==== id }
 
 	private def nextConversationId():ConversationId	=
 		ConversationId(Guid.fresh())

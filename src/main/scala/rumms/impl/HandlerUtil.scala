@@ -16,7 +16,7 @@ private object HandlerUtil {
 		action.swap.toOption map { _._2.logValue }
 
 	def actionResponder(action:Action[HttpResponder]):HttpResponder	=
-		action cata (_._1, identity)
+		action.cata(_._1, identity)
 
 	//------------------------------------------------------------------------------
 	//## problems

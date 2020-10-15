@@ -88,7 +88,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 			val (key, value)	= param
 			val pattern			= "@{" + key + "}"
 			val code			= JsonCodec encodeShort value
-			raw replace (pattern, code)
+			raw.replace(pattern, code)
 		}
 
 	//------------------------------------------------------------------------------
@@ -102,9 +102,9 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 		// BETTER send Json data here
 		val action:Action[HttpResponder]	=
 			for {
-				clientVersion	<- bodyString(request)	toUse (Forbidden,	"unreadable message")
+				clientVersion	<- bodyString(request).toUse(Forbidden,	"unreadable message")
 			}
-			yield clientVersion == serverVersion cata (
+			yield (clientVersion == serverVersion).cata (
 				Upgrade,
 				Connected(context.createConversation())
 			)
@@ -119,13 +119,13 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 
 		val action:Action[HttpResponder]	=
 			for {
-				json			<- bodyString(request)						toUse (Forbidden,		"unreadable message")
-				data			<- JsonCodec decode json					toUse (Forbidden,		"invalid message")
-				conversationId	<- (data / "conversation").string			toUse (Forbidden,		"conversationId missing")	map ConversationId.apply
-				clientCont		<- (data / "clientCont").toLong				toUse (Forbidden,		"clientCont missing")
-				serverCont		<- (data / "serverCont").toLong				toUse (Forbidden,		"serverCont missing")
-				incoming		<- (data / "messages").arraySeq				toUse (Forbidden,		"messages missing")
-				conversation	<- context findConversation conversationId	toUse (Disconnected,	"unknown conversation")
+				json			<- bodyString(request)						.toUse (Forbidden,		"unreadable message")
+				data			<- JsonCodec.decode(json)					.toUse (Forbidden,		"invalid message")
+				conversationId	<- (data / "conversation").string			.toUse (Forbidden,		"conversationId missing")	map ConversationId.apply
+				clientCont		<- (data / "clientCont").toLong				.toUse (Forbidden,		"clientCont missing")
+				serverCont		<- (data / "serverCont").toLong				.toUse (Forbidden,		"serverCont missing")
+				incoming		<- (data / "messages").arraySeq				.toUse (Forbidden,		"messages missing")
+				conversation	<- context.findConversation(conversationId)	.toUse (Disconnected,	"unknown conversation")
 			}
 			yield {
 				conversation.touch()
@@ -134,7 +134,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				conversation.handleHeartbeat()
 
 				// give new messages to the client
-				conversation handleIncoming (incoming, clientCont)
+				conversation.handleIncoming(incoming, clientCont)
 
 				def compileResponse(batch:Batch):HttpResponse = {
 					val json	=
@@ -159,7 +159,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				}
 				else {
 					val (responder, send)	=
-						HttpResponder async (
+						HttpResponder.async(
 							timeout	= Constants.continuationTTL,
 							timeoutResponse	= thunk {
 								compileResponse(conversation fetchOutgoing serverCont)
@@ -216,7 +216,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 			HeaderValues(
 				ContentType(application_json)
 			),
-			HttpOutput writeString (
+			HttpOutput.writeString(
 				Charsets.utf_8,
 				JsonCodec encodeShort json
 			)
@@ -227,9 +227,9 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 			OK,	None,
 			DisableCaching ++
 			HeaderValues(
-				ContentType(contentType addParameter ("charset",  Constants.encoding.name))
+				ContentType(contentType.addParameter("charset",  Constants.encoding.name))
 			),
-			HttpOutput writeString (Constants.encoding, text)
+			HttpOutput.writeString(Constants.encoding, text)
 		)
 
 	private def EmptyStatus(status:HttpStatus):HttpResponse	=
