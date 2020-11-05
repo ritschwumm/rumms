@@ -2,7 +2,7 @@ package rumms
 
 import javax.servlet.ServletContext
 
-import scutil.base.implicits._
+import scutil.core.implicits._
 import scutil.lang._
 import scutil.guid.Guid
 import scutil.worker._

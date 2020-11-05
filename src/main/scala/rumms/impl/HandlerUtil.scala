@@ -1,6 +1,6 @@
 package rumms.impl
 
-import scutil.base.implicits._
+import scutil.core.implicits._
 import scutil.log._
 
 import scjson.codec._
