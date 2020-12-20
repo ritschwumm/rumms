@@ -102,7 +102,7 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 
 	private def expireConversations():Unit	= {
 		conversations
-		.modify		(State(_  partition { _.alive() }))
+		.modify		(_  partition { _.alive() })
 		.map		{ _.id }
 		.foreach	(callbacks.conversationRemoved)
 	}
