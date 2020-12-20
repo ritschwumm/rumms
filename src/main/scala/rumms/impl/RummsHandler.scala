@@ -144,9 +144,9 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 							"messages"		-> batch.messages
 						)
 					json match {
-						case Good(x)		=>
+						case Validated.Good(x)		=>
 							JsonOK(x)
-						case Bad(errors)	=>
+						case Validated.Bad(errors)	=>
 							ERROR("json creation failed", errors)
 							EmptyStatus(INTERNAL_SERVER_ERROR)
 					}
