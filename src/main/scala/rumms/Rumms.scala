@@ -2,10 +2,12 @@ package rumms
 
 import javax.servlet.ServletContext
 
+import scala.util.control.NonFatal
+
 import scutil.core.implicits._
 import scutil.lang._
 import scutil.guid.Guid
-import scutil.worker._
+import scutil.concurrent._
 import scutil.log._
 
 import scwebapp._
@@ -17,7 +19,8 @@ import rumms.impl._
 
 object Rumms {
 	/** must be called from a ServletContextListener.contextInitialized method */
-	def create(sc:ServletContext, configuration:RummsConfiguration):Rumms	= {
+	def createAndMount(sc:ServletContext, configuration:RummsConfiguration):Rumms	= {
+		// TODO use Using here, too
 		new Rumms(configuration) doto { rumms =>
 			sc.mount(
 				name			= "RummsServlet",
@@ -27,28 +30,33 @@ object Rumms {
 			)
 		}
 	}
+
+	// TODO construct this from multiple Usings to ensure all resources are properly freed
+	def create(configuration:RummsConfiguration, callbacks:RummsCallbacks):Using[RummsSender]	=
+		Using.of(
+			()	=> new Rumms(configuration) doto (_.start(callbacks))
+		)(
+			_.close()
+		)
+		.map(identity[Rumms])
 }
 
-final class Rumms(configuration:RummsConfiguration) extends AutoCloseable with Logging { outer =>
+final class Rumms(configuration:RummsConfiguration) extends RummsSender with AutoCloseable with Logging { outer =>
 	@volatile
 	private var callbacks:RummsCallbacks	= null
 	private val conversations:Synchronized[Seq[Conversation]]	= Synchronized(Vector.empty)
 
-	private val rummsHandler	= new RummsHandler(configuration, new RummsHandlerContext{
-		def createConversation():ConversationId							= outer.createConversation()
-		def expireConversations():Unit									= outer.expireConversations()
-		def findConversation(id:ConversationId):Option[Conversation]	= outer findConversation id
-	})
+	private val rummsHandler	=
+		new RummsHandler(configuration, new RummsHandlerContext{
+			def createConversation():ConversationId							= outer.createConversation()
+			def expireConversations():Unit									= outer.expireConversations()
+			def findConversation(id:ConversationId):Option[Conversation]	= outer findConversation id
+		})
 	private val httpHandler:HttpHandler	= rummsHandler.totalPlan
 	private val mountPath:String		= configuration.path + "/*"
 
-	private val sendWorker	=
-		new Worker(
-			"conversation publisher",
-			Constants.sendDelay,
-			publishConversations _,
-			ERROR("publishing conversations failed", _)
-		)
+	@volatile
+	private var sendWorker:Disposable	= Disposable.empty
 
 	//------------------------------------------------------------------------------
 	//## public interface
@@ -64,7 +72,24 @@ final class Rumms(configuration:RummsConfiguration) extends AutoCloseable with L
 		this.callbacks	= callbacks
 
 		DEBUG("starting send worker")
-		sendWorker.start()
+		sendWorker	=
+			SimpleWorker.build(
+				"conversation publisher",
+				Thread.MIN_PRIORITY,
+				Io delay {
+					try {
+						publishConversations()
+						Thread.sleep(Constants.sendDelay.millis)
+						true
+					}
+					catch { case NonFatal(e) =>
+						ERROR("publishing conversations failed", e)
+						false
+					}
+
+				}
+			)
+			.openVoid()
 
 		INFO("running")
 	}
@@ -72,15 +97,13 @@ final class Rumms(configuration:RummsConfiguration) extends AutoCloseable with L
 	def close():Unit	= {
 		DEBUG("destroying send worker")
 
-		sendWorker.close()
-		sendWorker.awaitWorkless()
-		sendWorker.join()
+		sendWorker.dispose()
 
 		INFO("stopped")
 	}
 
 	/** ids of currently active Conversations */
-	def conversationIds:Set[ConversationId]	=
+	def conversationIds():Set[ConversationId]	=
 		(conversations.get() map { _.id }).toSet
 
 	/** send a message to a Conversation, returns success */
