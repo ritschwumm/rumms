@@ -29,7 +29,7 @@ object Rumms {
 	}
 }
 
-final class Rumms(configuration:RummsConfiguration) extends Disposable with Logging { outer =>
+final class Rumms(configuration:RummsConfiguration) extends AutoCloseable with Logging { outer =>
 	@volatile
 	private var callbacks:RummsCallbacks	= null
 	private val conversations:Synchronized[Seq[Conversation]]	= Synchronized(Vector.empty)
@@ -69,10 +69,10 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 		INFO("running")
 	}
 
-	def dispose():Unit	= {
+	def close():Unit	= {
 		DEBUG("destroying send worker")
 
-		sendWorker.dispose()
+		sendWorker.close()
 		sendWorker.awaitWorkless()
 		sendWorker.join()
 
@@ -115,5 +115,5 @@ final class Rumms(configuration:RummsConfiguration) extends Disposable with Logg
 		conversations.get() find { _.id ==== id }
 
 	private def nextConversationId():ConversationId	=
-		ConversationId(Guid.fresh())
+		ConversationId(Guid.unsafeFresh())
 }
