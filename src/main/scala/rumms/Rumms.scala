@@ -20,7 +20,7 @@ import rumms.impl._
 object Rumms {
 	/** must be called from a ServletContextListener.contextInitialized method */
 	def createAndMount(sc:ServletContext, configuration:RummsConfiguration):Rumms	= {
-		// TODO use Using here, too
+		// TODO using use Using here, too
 		new Rumms(configuration) doto { rumms =>
 			sc.mount(
 				name			= "RummsServlet",
@@ -31,14 +31,14 @@ object Rumms {
 		}
 	}
 
-	// TODO construct this from multiple Usings to ensure all resources are properly freed
+	// TODO using construct this from multiple Usings to ensure all resources are properly freed
 	def create(configuration:RummsConfiguration, callbacks:RummsCallbacks):Using[RummsSender]	=
 		Using.of(
 			()	=> new Rumms(configuration) doto (_.start(callbacks))
 		)(
 			_.close()
 		)
-		.map(identity[Rumms])
+		.map(identity[RummsSender])
 }
 
 final class Rumms(configuration:RummsConfiguration) extends RummsSender with AutoCloseable with Logging { outer =>
@@ -56,7 +56,7 @@ final class Rumms(configuration:RummsConfiguration) extends RummsSender with Aut
 	private val mountPath:String		= configuration.path + "/*"
 
 	@volatile
-	private var sendWorker:Disposable	= Disposable.empty
+	private var sendWorker:Disposer	= Disposer.empty
 
 	//------------------------------------------------------------------------------
 	//## public interface

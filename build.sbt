@@ -2,7 +2,7 @@ Global / onChangedBuildSource := ReloadOnSourceChanges
 
 name			:= "rumms"
 organization	:= "de.djini"
-version			:= "0.282.0"
+version			:= "0.283.0"
 
 scalaVersion	:= "2.13.4"
 scalacOptions	++= Seq(
@@ -15,12 +15,12 @@ scalacOptions	++= Seq(
 
 conflictManager		:= ConflictManager.strict withOrganization "^(?!(org\\.scala-lang|org\\.scala-js)(\\..*)?)$"
 libraryDependencies	++= Seq(
-	"de.djini"		%%	"scutil-jdk"		% "0.198.0"	% "compile",
-	"de.djini"		%%	"scutil-guid"		% "0.198.0"	% "compile",
-	"de.djini"		%%	"scjson-codec"		% "0.219.0"	% "compile",
-	"de.djini"		%%	"scjson-converter"	% "0.219.0"	% "compile",
-	"de.djini"		%%	"scwebapp-core"		% "0.250.0"	% "compile",
-	"de.djini"		%%	"scwebapp-servlet"	% "0.250.0"	% "compile",
+	"de.djini"		%%	"scutil-jdk"		% "0.199.0"	% "compile",
+	"de.djini"		%%	"scutil-guid"		% "0.199.0"	% "compile",
+	"de.djini"		%%	"scjson-codec"		% "0.220.0"	% "compile",
+	"de.djini"		%%	"scjson-converter"	% "0.220.0"	% "compile",
+	"de.djini"		%%	"scwebapp-core"		% "0.251.0"	% "compile",
+	"de.djini"		%%	"scwebapp-servlet"	% "0.251.0"	% "compile",
 	"javax.servlet"	%   "javax.servlet-api"	% "3.1.0"	% "provided"
 )
 
