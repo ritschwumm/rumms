@@ -69,7 +69,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	private def clientCode(servletPrefix:String):String	= {
 		val resource	= "rumms/Client.js"
 		val raw	=
-			getClass.getClassLoader.resourceProvider
+			getClass.getClassLoader.classpathResourceProvider
 			.readByteString	(resource)
 			.getOrError 	(show"cannot read resource ${resource}")
 			.into			(Constants.encoding.decodeEitherByteString)
