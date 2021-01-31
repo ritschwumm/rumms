@@ -17,122 +17,128 @@ import scjson.ast._
 
 import rumms.impl._
 
-object Rumms {
-	/** must be called from a ServletContextListener.contextInitialized method */
-	def createAndMount(sc:ServletContext, configuration:RummsConfiguration):Rumms	=
-		// TODO using use Using here, too
-		new Rumms(configuration) doto { rumms =>
-			sc.mount(
-				name			= "RummsServlet",
-				handler			= rumms.httpHandler,
-				mappings		= Vector(rumms.mountPath),
-				loadOnStartup	= Some(100)
-			)
-		}
+object Rumms extends Logging {
+	def create(configuration:RummsConfiguration):IoResource[Rumms]	=
+		for {
+			rumms	<-	IoResource delay new Rumms(configuration)
+			_		<-	SimpleWorker.ioResource(
+							"rumms conversation publisher",
+							Thread.MIN_PRIORITY,
+							Io delay {
+								try {
+									rumms.publishConversations()
+									Thread.sleep(Constants.sendDelay.millis)
+									true
+								}
+								catch { case NonFatal(e) =>
+									ERROR("publishing conversations failed", e)
+									false
+								}
 
-	// TODO using construct this from multiple Usings to ensure all resources are properly freed
-	def create(configuration:RummsConfiguration, callbacks:RummsCallbacks):IoResource[RummsSender]	=
-		IoResource.unsafe.disposing(
-			new Rumms(configuration) doto (_.start(callbacks))
-		)(
-			_.close()
-		)
-		.map(identity[RummsSender])
+							}
+						)
+		}
+		yield rumms
 }
 
-final class Rumms(configuration:RummsConfiguration) extends RummsSender with AutoCloseable with Logging { outer =>
-	@volatile
-	private var callbacks:RummsCallbacks	= null
-	private val conversations:Synchronized[Seq[Conversation]]	= Synchronized(Vector.empty)
-
+final class Rumms(configuration:RummsConfiguration) { outer =>
 	private val rummsHandler	=
-		new RummsHandler(configuration, new RummsHandlerContext{
-			def createConversation():ConversationId							= outer.createConversation()
-			def expireConversations():Unit									= outer.expireConversations()
-			def findConversation(id:ConversationId):Option[Conversation]	= outer findConversation id
-		})
-	private val httpHandler:HttpHandler	= rummsHandler.totalPlan
-	private val mountPath:String		= configuration.path + "/*"
-
-	@volatile
-	private var sendWorkerDisposer:IoDisposer	= IoDisposer.empty
+		new RummsHandler(
+			configuration,
+			new RummsHandlerContext {
+				def createConversation():ConversationId							= outer.createConversation()
+				def expireConversations():Unit									= outer.expireConversations()
+				def findConversation(id:ConversationId):Option[Conversation]	= outer findConversation id
+			}
+		)
 
 	//------------------------------------------------------------------------------
 	//## public interface
 
-	val partialHandler:HttpPHandler	= rummsHandler.partialPlan
-
 	/** relative to the webapp's context */
 	val codePath:String	= (configuration.path substring 1) + Constants.paths.code + "?_="
 
-	def start(callbacks:RummsCallbacks):Unit	= {
-		require(this.callbacks == null, "rumms application is already started")
+	/** must be called from a ServletContextListener.contextInitialized method */
+	def mountAt(sc:ServletContext):Unit	=
+		sc.mount(
+			name			= "RummsServlet",
+			handler			= rummsHandler.totalPlan,
+			mappings		= Vector(configuration.path + "/*"),
+			loadOnStartup	= Some(100),
+			multipartConfig	= None
+		)
 
-		this.callbacks	= callbacks
-
-		DEBUG("starting send worker")
-		sendWorkerDisposer	=
-			SimpleWorker.ioResource(
-				"conversation publisher",
-				Thread.MIN_PRIORITY,
-				Io delay {
-					try {
-						publishConversations()
-						Thread.sleep(Constants.sendDelay.millis)
-						true
-					}
-					catch { case NonFatal(e) =>
-						ERROR("publishing conversations failed", e)
-						false
-					}
-
-				}
-			)
-			.openVoid
-			.unsafeRun()
-
-		INFO("running")
-	}
-
-	def close():Unit	= {
-		DEBUG("destroying send worker")
-
-		sendWorkerDisposer.unsafeRun()
-
-		INFO("stopped")
-	}
+	val partialHandler:HttpPHandler	= rummsHandler.partialPlan
 
 	/** ids of currently active Conversations */
 	def conversationIds():Set[ConversationId]	=
-		(conversations.get() map { _.id }).toSet
+		conversations.get().map(_.id).toSet
 
 	/** send a message to a Conversation, returns success */
 	def sendMessage(receiver:ConversationId, message:JsonValue):Boolean	=
-		findConversation(receiver)
-		.someEffect	{ _ appendOutgoing message }
-		.isDefined
+		findConversation(receiver).someEffect(_ appendOutgoing message).isDefined
+
+	/** send a message to all Conversations */
+	def broadcastMessage(message:JsonValue):Unit	=
+		conversations.get().foreach(_ appendOutgoing message)
+
+	/** listen for incoming messages and conversation status changes */
+	def listen(callbacks:RummsCallbacks):IoResource[Unit]	=
+		IoResource.unsafe.disposing{
+			addCallbacks(callbacks)
+		}{
+			_ => removeCallbacks(callbacks)
+		}
+		.void
+
+	//------------------------------------------------------------------------------
+	//## callbacks
+
+	private val callbackses:Synchronized[Seq[RummsCallbacks]]	= Synchronized(Vector.empty)
+
+	private def addCallbacks(callbacks:RummsCallbacks):Unit	=
+		callbackses update (_ :+ callbacks)
+
+	private def removeCallbacks(callbacks:RummsCallbacks):Unit	=
+		callbackses update (_ filter (_ != callbacks))
+
+	private val callbacksProxy:RummsCallbacks	=
+		new RummsCallbacks {
+			def conversationAdded(conversationId:ConversationId):Unit	=
+				callbackses.get() foreach (_ conversationAdded conversationId)
+
+			def conversationRemoved(conversationId:ConversationId):Unit	=
+				callbackses.get() foreach (_ conversationRemoved conversationId)
+
+			def conversationAlive(conversationId:ConversationId):Unit	=
+				callbackses.get() foreach (_ conversationAlive conversationId)
+
+			def messageReceived(conversationId:ConversationId, message:JsonValue):Unit	=
+				callbackses.get() foreach (_.messageReceived(conversationId, message))
+		}
+
 
 	//------------------------------------------------------------------------------
 	//## eonversations
 
+	private val conversations:Synchronized[Seq[Conversation]]	= Synchronized(Vector.empty)
+
 	private def createConversation():ConversationId = {
 		val	conversationId	= nextConversationId()
-		val conversation	= new Conversation(conversationId, callbacks)
+		val conversation	= new Conversation(conversationId, callbacksProxy)
 		conversations update { _ :+ conversation }
-		callbacks conversationAdded conversationId
+		callbacksProxy.conversationAdded(conversationId)
 		conversationId
 	}
 
-	private def expireConversations():Unit	= {
+	private def expireConversations():Unit	=
 		conversations
 		.modify		(_  partition { _.alive() })
 		.map		{ _.id }
-		.foreach	(callbacks.conversationRemoved)
-	}
+		.foreach	(callbacksProxy.conversationRemoved)
 
-	private def publishConversations():Unit	= {
+	private def publishConversations():Unit	=
 		conversations.get() foreach { _.maybePublish() }
-	}
 
 	private def findConversation(id:ConversationId):Option[Conversation]	=
 		conversations.get() find { _.id ==== id }
