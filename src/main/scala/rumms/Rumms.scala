@@ -19,7 +19,7 @@ import rumms.impl._
 
 object Rumms {
 	/** must be called from a ServletContextListener.contextInitialized method */
-	def createAndMount(sc:ServletContext, configuration:RummsConfiguration):Rumms	= {
+	def createAndMount(sc:ServletContext, configuration:RummsConfiguration):Rumms	=
 		// TODO using use Using here, too
 		new Rumms(configuration) doto { rumms =>
 			sc.mount(
@@ -29,12 +29,11 @@ object Rumms {
 				loadOnStartup	= Some(100)
 			)
 		}
-	}
 
 	// TODO using construct this from multiple Usings to ensure all resources are properly freed
-	def create(configuration:RummsConfiguration, callbacks:RummsCallbacks):Using[RummsSender]	=
-		Using.of(
-			()	=> new Rumms(configuration) doto (_.start(callbacks))
+	def create(configuration:RummsConfiguration, callbacks:RummsCallbacks):IoResource[RummsSender]	=
+		IoResource.unsafe.disposing(
+			new Rumms(configuration) doto (_.start(callbacks))
 		)(
 			_.close()
 		)
@@ -56,7 +55,7 @@ final class Rumms(configuration:RummsConfiguration) extends RummsSender with Aut
 	private val mountPath:String		= configuration.path + "/*"
 
 	@volatile
-	private var sendWorker:Disposer	= Disposer.empty
+	private var sendWorker:IoDisposer	= IoDisposer.empty
 
 	//------------------------------------------------------------------------------
 	//## public interface
@@ -73,7 +72,7 @@ final class Rumms(configuration:RummsConfiguration) extends RummsSender with Aut
 
 		DEBUG("starting send worker")
 		sendWorker	=
-			SimpleWorker.build(
+			SimpleWorker.ioResource(
 				"conversation publisher",
 				Thread.MIN_PRIORITY,
 				Io delay {
@@ -89,7 +88,8 @@ final class Rumms(configuration:RummsConfiguration) extends RummsSender with Aut
 
 				}
 			)
-			.openVoid()
+			.openVoid
+			.unsafeRun()
 
 		INFO("running")
 	}
@@ -97,7 +97,7 @@ final class Rumms(configuration:RummsConfiguration) extends RummsSender with Aut
 	def close():Unit	= {
 		DEBUG("destroying send worker")
 
-		sendWorker.dispose()
+		sendWorker.unsafeRun()
 
 		INFO("stopped")
 	}
