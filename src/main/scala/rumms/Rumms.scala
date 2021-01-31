@@ -55,7 +55,7 @@ final class Rumms(configuration:RummsConfiguration) extends RummsSender with Aut
 	private val mountPath:String		= configuration.path + "/*"
 
 	@volatile
-	private var sendWorker:IoDisposer	= IoDisposer.empty
+	private var sendWorkerDisposer:IoDisposer	= IoDisposer.empty
 
 	//------------------------------------------------------------------------------
 	//## public interface
@@ -71,7 +71,7 @@ final class Rumms(configuration:RummsConfiguration) extends RummsSender with Aut
 		this.callbacks	= callbacks
 
 		DEBUG("starting send worker")
-		sendWorker	=
+		sendWorkerDisposer	=
 			SimpleWorker.ioResource(
 				"conversation publisher",
 				Thread.MIN_PRIORITY,
@@ -97,7 +97,7 @@ final class Rumms(configuration:RummsConfiguration) extends RummsSender with Aut
 	def close():Unit	= {
 		DEBUG("destroying send worker")
 
-		sendWorker.unsafeRun()
+		sendWorkerDisposer.unsafeRun()
 
 		INFO("stopped")
 	}

@@ -23,7 +23,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	private var lastClientCont	= 0L
 
 	def handleHeartbeat():Unit	=
-			callbacks conversationAlive id
+		callbacks conversationAlive id
 
 	/** client -> server */
 	def handleIncoming(incoming:Seq[JsonValue], clientCont:Long):Unit	=
@@ -74,7 +74,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 
 	// NOTE was done directly in appendOutgoing and is now done in a worker thread
 	// to give the queue a chance to grow a little bit before sending
-	def maybePublish():Unit	= {
+	def maybePublish():Unit	=
 		synchronized {
 			(MilliInstant.now() - lastAppend >= Constants.sendDelay) &&
 			entries.nonEmpty flatOption {
@@ -87,7 +87,6 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 			try { it() }
 			catch { case e:Exception => ERROR("cannot publish", e) }
 		}
-	}
 
 	/** used by the webserver to be notified there is data to fetch */
 	def onHasOutgoing(publisher:Thunk[Unit]):Unit =

@@ -2,7 +2,7 @@ Global / onChangedBuildSource := ReloadOnSourceChanges
 
 name			:= "rumms"
 organization	:= "de.djini"
-version			:= "0.287.0"
+version			:= "0.288.0"
 
 scalaVersion	:= "2.13.4"
 scalacOptions	++= Seq(

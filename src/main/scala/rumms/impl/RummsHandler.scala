@@ -19,7 +19,7 @@ import scwebapp.status._
 import scwebapp.header._
 import scwebapp.data.MimeType
 
-import rumms.impl.HandlerUtil._
+import rumms.impl.syntax._
 
 /** mount this with an url-pattern of <configuration.path>/STAR (where STAR is a literal "*") */
 final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerContext) extends Logging {
@@ -68,12 +68,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 
 	private def clientCode(servletPrefix:String):String	= {
 		val resource	= "rumms/Client.js"
-		val raw	=
-			getClass.getClassLoader.classpathResource(resource)
-			.map			(_.byteString)
-			.getOrError 	(show"cannot read resource ${resource}")
-			.into			(Constants.encoding.decodeEitherByteString)
-			.getOrError 	(show"cannot decode resource value")
+		val raw			= getClass.getClassLoader.classpathResourceOrError(resource).string(Constants.encoding)
 		configure(raw, Map[String,JsonValue](
 			"VERSION"			-> JsonString(serverVersion),
 			"ENCODING"			-> JsonString(Constants.encoding.name),
@@ -102,15 +97,15 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 		// BETTER send Json data here
 		val action:Action[HttpResponder]	=
 			for {
-				clientVersion	<- bodyString(request).toUse(Forbidden,	"unreadable message")
+				clientVersion	<- bodyString(request).toAction(Forbidden,	"unreadable message")
 			}
 			yield (clientVersion == serverVersion).cata (
 				Upgrade,
 				Connected(context.createConversation())
 			)
 
-		actionLog(action) foreach { ERROR(_:_*) }
-		actionResponder(action)
+		action.log foreach { ERROR(_:_*) }
+		action.responder
 	}
 
 	/** receive and send messages for a single Conversation */
@@ -119,13 +114,13 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 
 		val action:Action[HttpResponder]	=
 			for {
-				json			<- bodyString(request)						.toUse (Forbidden,		"unreadable message")
-				data			<- JsonCodec.decode(json)					.toUse (Forbidden,		"invalid message")
-				conversationId	<- (data / "conversation").string			.toUse (Forbidden,		"conversationId missing")	map ConversationId.apply
-				clientCont		<- (data / "clientCont").toLong				.toUse (Forbidden,		"clientCont missing")
-				serverCont		<- (data / "serverCont").toLong				.toUse (Forbidden,		"serverCont missing")
-				incoming		<- (data / "messages").arraySeq				.toUse (Forbidden,		"messages missing")
-				conversation	<- context.findConversation(conversationId)	.toUse (Disconnected,	"unknown conversation")
+				json			<- bodyString(request)						.toAction (Forbidden,		"unreadable message")
+				data			<- JsonCodec.decode(json)					.toAction (Forbidden,		"invalid message")
+				conversationId	<- (data / "conversation").string			.toAction (Forbidden,		"conversationId missing")	map ConversationId.apply
+				clientCont		<- (data / "clientCont").toLong				.toAction (Forbidden,		"clientCont missing")
+				serverCont		<- (data / "serverCont").toLong				.toAction (Forbidden,		"serverCont missing")
+				incoming		<- (data / "messages").arraySeq				.toAction (Forbidden,		"messages missing")
+				conversation	<- context.findConversation(conversationId)	.toAction (Disconnected,	"unknown conversation")
 			}
 			yield {
 				conversation.touch()
@@ -175,8 +170,8 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				}
 			}
 
-		actionLog(action) foreach { ERROR(_:_*) }
-		actionResponder(action)
+		action.log foreach { ERROR(_:_*) }
+		action.responder
 	}
 
 	private def bodyString(request:HttpRequest):Either[Exception,String]	=
