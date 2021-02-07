@@ -70,10 +70,10 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 		val resource	= "rumms/Client.js"
 		val raw			= getClass.getClassLoader.classpathResourceOrError(resource).string(Constants.encoding)
 		configure(raw, Map[String,JsonValue](
-			"VERSION"			-> JsonString(serverVersion),
-			"ENCODING"			-> JsonString(Constants.encoding.name),
-			"CLIENT_TTL"		-> JsonNumber(Constants.clientTTL.millis),
-			"SERVLET_PREFIX"	-> JsonString(servletPrefix)
+			"VERSION"			-> JsonValue.fromString(serverVersion),
+			"ENCODING"			-> JsonValue.fromString(Constants.encoding.name),
+			"CLIENT_TTL"		-> JsonValue.fromLong(Constants.clientTTL.millis),
+			"SERVLET_PREFIX"	-> JsonValue.fromString(servletPrefix)
 		))
 	}
 
