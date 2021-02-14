@@ -2,7 +2,7 @@ Global / onChangedBuildSource := ReloadOnSourceChanges
 
 name			:= "rumms"
 organization	:= "de.djini"
-version			:= "0.293.0"
+version			:= "0.294.0"
 
 scalaVersion	:= "2.13.4"
 scalacOptions	++= Seq(
@@ -17,8 +17,8 @@ conflictManager		:= ConflictManager.strict withOrganization "^(?!(org\\.scala-la
 libraryDependencies	++= Seq(
 	"de.djini"		%%	"scutil-jdk"		% "0.203.0"	% "compile",
 	"de.djini"		%%	"scutil-guid"		% "0.203.0"	% "compile",
-	"de.djini"		%%	"scjson-codec"		% "0.227.0"	% "compile",
-	"de.djini"		%%	"scjson-converter"	% "0.227.0"	% "compile",
+	"de.djini"		%%	"scjson-codec"		% "0.228.0"	% "compile",
+	"de.djini"		%%	"scjson-converter"	% "0.228.0"	% "compile",
 	"de.djini"		%%	"scwebapp-core"		% "0.257.0"	% "compile",
 	"de.djini"		%%	"scwebapp-servlet"	% "0.257.0"	% "compile",
 	"javax.servlet"	%   "javax.servlet-api"	% "3.1.0"	% "provided"
