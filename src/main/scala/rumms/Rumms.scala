@@ -1,6 +1,6 @@
 package rumms
 
-import javax.servlet.ServletContext
+import jakarta.servlet.ServletContext
 
 import scala.util.control.NonFatal
 
