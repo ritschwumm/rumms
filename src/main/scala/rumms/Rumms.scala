@@ -21,7 +21,7 @@ object Rumms extends Logging {
 	def create(configuration:RummsConfiguration):IoResource[Rumms]	=
 		for {
 			rumms	<-	IoResource delay new Rumms(configuration)
-			_		<-	SimpleWorker.ioResource(
+			_		<-	SimpleWorker.create(
 							"rumms conversation publisher",
 							Thread.MIN_PRIORITY,
 							Io delay {

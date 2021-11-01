@@ -33,7 +33,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 
 	lazy val totalPlan:HttpHandler	=
 		partialPlan	orAlways
-		constant(HttpResponder(EmptyStatus(NOT_FOUND)))
+		constant(HttpResponder.sync(EmptyStatus(NOT_FOUND)))
 
 	lazy val partialPlan:HttpPHandler	=
 		subHandler(GET,		paths.code,	code)	orElse
@@ -50,10 +50,10 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 					}
 					catch { case e:Exception =>
 						ERROR(e)
-						HttpResponder(EmptyStatus(INTERNAL_SERVER_ERROR))
+						HttpResponder.sync(EmptyStatus(INTERNAL_SERVER_ERROR))
 					}
 				}
-				else HttpResponder(EmptyStatus(METHOD_NOT_ALLOWED))
+				else HttpResponder.sync(EmptyStatus(METHOD_NOT_ALLOWED))
 			}
 		}
 
@@ -150,7 +150,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				// maybe there already are new messages, if not, we have to wait
 				val fromConversation	= conversation fetchOutgoing serverCont
 				if (fromConversation.messages.nonEmpty || incoming.nonEmpty) {
-					HttpResponder(compileResponse(fromConversation))
+					HttpResponder.sync(compileResponse(fromConversation))
 				}
 				else {
 					val (responder, send)	=
@@ -185,10 +185,10 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	private val UPGRADED_TEXT		= "VERSION"
 
 	private val Forbidden:HttpResponder		=
-		HttpResponder(EmptyStatus(FORBIDDEN))
+		HttpResponder.sync(EmptyStatus(FORBIDDEN))
 
 	private def ClientCode(code:String):HttpResponder	=
-		HttpResponder(StringOK(code, text_javascript))
+		HttpResponder.sync(StringOK(code, text_javascript))
 
 	private def Connected(conversationId:ConversationId):HttpResponder	=
 		SendPlainTextCharset(CONNECTED_TEXT + " " + conversationId.value)
@@ -200,7 +200,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 		SendPlainTextCharset(DISCONNECTED_TEXT)
 
 	private def SendPlainTextCharset(s:String):HttpResponder	=
-		HttpResponder(StringOK(s, text_plain))
+		HttpResponder.sync(StringOK(s, text_plain))
 
 	//------------------------------------------------------------------------------
 
