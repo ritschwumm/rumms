@@ -11,7 +11,7 @@ import scutil.concurrent._
 import scutil.log._
 
 import scwebapp._
-import scwebapp.servlet.implicits._
+import scwebapp.servlet.extensions._
 
 import scjson.ast._
 
