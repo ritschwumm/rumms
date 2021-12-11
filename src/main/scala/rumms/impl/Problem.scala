@@ -1,6 +1,6 @@
 package rumms.impl
 
-import scutil.log._
+import scutil.log.*
 
 object Problem {
 	final case class Plain(message:String) extends Problem {

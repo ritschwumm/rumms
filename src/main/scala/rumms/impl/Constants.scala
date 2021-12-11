@@ -1,7 +1,7 @@
 package rumms.impl
 
 import scutil.lang.Charsets
-import scutil.time.implicits._
+import scutil.time.implicits.*
 
 object Constants {
 	val version			= 1

@@ -1,8 +1,8 @@
 package rumms.impl
 
-import scutil.core.implicits._
-import scutil.log._
-import scwebapp._
+import scutil.core.implicits.*
+import scutil.log.*
+import scwebapp.*
 
 final case class Action[T](value:Either[(HttpResponder, Problem), T]) {
 	def log:Option[Seq[LogValue]]	=

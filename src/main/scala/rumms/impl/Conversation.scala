@@ -1,12 +1,12 @@
 package rumms
 package impl
 
-import scutil.core.implicits._
-import scutil.lang._
-import scutil.time._
-import scutil.log._
+import scutil.core.implicits.*
+import scutil.lang.*
+import scutil.time.*
+import scutil.log.*
 
-import scjson.ast._
+import scjson.ast.*
 
 final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extends Logging {
 	//------------------------------------------------------------------------------

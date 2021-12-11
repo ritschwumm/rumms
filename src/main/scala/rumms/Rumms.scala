@@ -4,18 +4,18 @@ import jakarta.servlet.ServletContext
 
 import scala.util.control.NonFatal
 
-import scutil.core.implicits._
-import scutil.lang._
+import scutil.core.implicits.*
+import scutil.lang.*
 import scutil.guid.Guid
-import scutil.concurrent._
-import scutil.log._
+import scutil.concurrent.*
+import scutil.log.*
 
-import scwebapp._
-import scwebapp.servlet.extensions._
+import scwebapp.*
+import scwebapp.servlet.extensions.*
 
-import scjson.ast._
+import scjson.ast.*
 
-import rumms.impl._
+import rumms.impl.*
 
 object Rumms extends Logging {
 	def create(configuration:RummsConfiguration):IoResource[Rumms]	=

@@ -1,5 +1,5 @@
 package rumms.impl
 
-import scjson.ast._
+import scjson.ast.*
 
 final case class Batch(serverCont:Long, messages:Seq[JsonValue])

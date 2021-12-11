@@ -1,22 +1,22 @@
 package rumms
 package impl
 
-import scutil.core.implicits._
-import scutil.jdk.implicits._
-import scutil.lang._
-import scutil.log._
+import scutil.core.implicits.*
+import scutil.jdk.implicits.*
+import scutil.lang.*
+import scutil.log.*
 
-import scjson.ast._
-import scjson.ast.JsonNavigation._
-import scjson.codec._
-import scjson.converter._
-import scjson.converter.syntax._
+import scjson.ast.*
+import scjson.ast.JsonNavigation.*
+import scjson.codec.*
+import scjson.converter.*
+import scjson.converter.syntax.*
 
-import scwebapp._
-import scwebapp.instances._
-import scwebapp.method._
-import scwebapp.status._
-import scwebapp.header._
+import scwebapp.*
+import scwebapp.instances.*
+import scwebapp.method.*
+import scwebapp.status.*
+import scwebapp.header.*
 import scwebapp.data.MimeType
 
 /** mount this with an url-pattern of <configuration.path>/STAR (where STAR is a literal "*") */
@@ -102,7 +102,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				Connected(context.createConversation())
 			)
 
-		action.log foreach { ERROR(_:_*) }
+		action.log foreach { ERROR(_*) }
 		action.responder
 	}
 
@@ -168,7 +168,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				}
 			}
 
-		action.log foreach { ERROR(_:_*) }
+		action.log foreach { ERROR(_*) }
 		action.responder
 	}
 

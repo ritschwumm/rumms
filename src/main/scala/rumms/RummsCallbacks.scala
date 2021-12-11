@@ -1,6 +1,6 @@
 package rumms
 
-import scjson.ast._
+import scjson.ast.*
 
 trait RummsCallbacks {
 	/**  a new Conversation has been opened */
