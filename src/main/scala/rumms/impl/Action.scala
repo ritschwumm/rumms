@@ -8,7 +8,7 @@ final case class Action[T](value:Either[(HttpResponder, Problem), T]) {
 	def log:Option[Seq[LogValue]]	=
 		value.swap.toOption map { _._2.logValue }
 
-	def responder(implicit ev:T <:< HttpResponder):HttpResponder	=
+	def responder(using ev:T <:< HttpResponder):HttpResponder	=
 		value.cata(_._1, ev)
 
 	def map[U](func:T=>U):Action[U]	=
