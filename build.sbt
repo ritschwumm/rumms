@@ -4,7 +4,7 @@ ThisBuild / versionScheme := Some("early-semver")
 
 name			:= "rumms"
 organization	:= "de.djini"
-version			:= "0.326.0"
+version			:= "0.327.0"
 
 scalaVersion	:= "3.1.3"
 scalacOptions	++= Seq(
@@ -18,12 +18,12 @@ scalacOptions	++= Seq(
 
 conflictManager		:= ConflictManager.strict withOrganization "^(?!(org\\.scala-lang|org\\.scala-js)(\\..*)?)$"
 libraryDependencies	++= Seq(
-	"de.djini"			%%	"scutil-jdk"			% "0.230.0"	% "compile",
-	"de.djini"			%%	"scutil-guid"			% "0.230.0"	% "compile",
-	"de.djini"			%%	"scjson-codec"			% "0.258.0"	% "compile",
-	"de.djini"			%%	"scjson-converter"		% "0.258.0"	% "compile",
-	"de.djini"			%%	"scwebapp-core"			% "0.288.0"	% "compile",
-	"de.djini"			%%	"scwebapp-servlet"		% "0.288.0"	% "compile",
+	"de.djini"			%%	"scutil-jdk"			% "0.231.0"	% "compile",
+	"de.djini"			%%	"scutil-guid"			% "0.231.0"	% "compile",
+	"de.djini"			%%	"scjson-codec"			% "0.259.0"	% "compile",
+	"de.djini"			%%	"scjson-converter"		% "0.259.0"	% "compile",
+	"de.djini"			%%	"scwebapp-core"			% "0.289.0"	% "compile",
+	"de.djini"			%%	"scwebapp-servlet"		% "0.289.0"	% "compile",
 	"jakarta.servlet"	%   "jakarta.servlet-api"	% "5.0.0"	% "provided"
 )
 
