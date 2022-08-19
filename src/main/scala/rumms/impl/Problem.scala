@@ -2,15 +2,13 @@ package rumms.impl
 
 import scutil.log.*
 
-object Problem {
-	final case class Plain(message:String) extends Problem {
-		def logValue:Seq[LogValue]	= Seq(LogValue.string(message))
-	}
-	final case class Exceptional(message:String, exception:Exception) extends Problem {
-		def logValue:Seq[LogValue]	= Seq[LogValue](LogValue.string(message), LogValue.throwable(exception))
-	}
-}
+enum Problem {
+	case Plain(message:String)
+	case Exceptional(message:String, exception:Exception)
 
-sealed trait Problem {
-	def logValue:Seq[LogValue]
+	def logValue:Seq[LogValue]	=
+		this match {
+			case Plain(message)						=> Seq(LogValue.string(message))
+			case Exceptional(message, exception)	=> Seq(LogValue.string(message), LogValue.throwable(exception))
+		}
 }
