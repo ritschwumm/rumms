@@ -23,7 +23,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	private var lastClientCont	= 0L
 
 	def handleHeartbeat():Unit	=
-		callbacks conversationAlive id
+		callbacks.conversationAlive(id)
 
 	/** client -> server */
 	def handleIncoming(incoming:Seq[JsonValue], clientCont:Long):Unit	=
@@ -36,7 +36,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 			}
 			val expected	= (clientCont - lastClientCont)
 			val count		= incoming.size
-			val relevant	= incoming.size min expected.toInt
+			val relevant	= incoming.size `min` expected.toInt
 			lastClientCont	= clientCont
 			incoming drop (count-relevant)
 		}

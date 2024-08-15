@@ -20,7 +20,7 @@ import rumms.impl.*
 object Rumms extends Logging {
 	def create(configuration:RummsConfiguration):IoResource[Rumms]	=
 		for {
-			rumms	<-	IoResource delay new Rumms(configuration)
+			rumms	<-	IoResource.delay { new Rumms(configuration) }
 			_		<-	SimpleWorker.create(
 							"rumms conversation publisher",
 							Thread.MIN_PRIORITY,
@@ -48,7 +48,7 @@ final class Rumms(configuration:RummsConfiguration) { outer =>
 			new RummsHandlerContext {
 				def createConversation():ConversationId							= outer.createConversation()
 				def expireConversations():Unit									= outer.expireConversations()
-				def findConversation(id:ConversationId):Option[Conversation]	= outer findConversation id
+				def findConversation(id:ConversationId):Option[Conversation]	= outer.findConversation(id)
 			}
 		)
 
@@ -56,7 +56,7 @@ final class Rumms(configuration:RummsConfiguration) { outer =>
 	//## public interface
 
 	/** relative to the webapp's context */
-	val codePath:String	= (configuration.path substring 1) + Constants.paths.code + "?_="
+	val codePath:String	= configuration.path.substring(1) + Constants.paths.code + "?_="
 
 	/** must be called from a ServletContextListener.contextInitialized method */
 	def mountAt(sc:ServletContext):Unit	=
@@ -76,11 +76,11 @@ final class Rumms(configuration:RummsConfiguration) { outer =>
 
 	/** send a message to a Conversation, returns success */
 	def sendMessage(receiver:ConversationId, message:JsonValue):Boolean	=
-		findConversation(receiver).someEffect(_ appendOutgoing message).isDefined
+		findConversation(receiver).someEffect(_.appendOutgoing(message)).isDefined
 
 	/** send a message to all Conversations */
 	def broadcastMessage(message:JsonValue):Unit	=
-		conversations.get().foreach(_ appendOutgoing message)
+		conversations.get().foreach(_.appendOutgoing(message))
 
 	/** listen for incoming messages and conversation status changes */
 	def listen(callbacks:RummsCallbacks):IoResource[Unit]	=
@@ -97,24 +97,24 @@ final class Rumms(configuration:RummsConfiguration) { outer =>
 	private val callbackses:Synchronized[Seq[RummsCallbacks]]	= Synchronized(Vector.empty)
 
 	private def addCallbacks(callbacks:RummsCallbacks):Unit	=
-		callbackses update (_ :+ callbacks)
+		callbackses.update(_ :+ callbacks)
 
 	private def removeCallbacks(callbacks:RummsCallbacks):Unit	=
-		callbackses update (_ filter (_ != callbacks))
+		callbackses.update(_.filter(_ != callbacks))
 
 	private val callbacksProxy:RummsCallbacks	=
 		new RummsCallbacks {
 			def conversationAdded(conversationId:ConversationId):Unit	=
-				callbackses.get() foreach (_ conversationAdded conversationId)
+				callbackses.get().foreach(_.conversationAdded(conversationId))
 
 			def conversationRemoved(conversationId:ConversationId):Unit	=
-				callbackses.get() foreach (_ conversationRemoved conversationId)
+				callbackses.get().foreach(_.conversationRemoved(conversationId))
 
 			def conversationAlive(conversationId:ConversationId):Unit	=
-				callbackses.get() foreach (_ conversationAlive conversationId)
+				callbackses.get().foreach(_.conversationAlive(conversationId))
 
 			def messageReceived(conversationId:ConversationId, message:JsonValue):Unit	=
-				callbackses.get() foreach (_.messageReceived(conversationId, message))
+				callbackses.get().foreach(_.messageReceived(conversationId, message))
 		}
 
 
@@ -126,22 +126,22 @@ final class Rumms(configuration:RummsConfiguration) { outer =>
 	private def createConversation():ConversationId = {
 		val	conversationId	= nextConversationId()
 		val conversation	= new Conversation(conversationId, callbacksProxy)
-		conversations update { _ :+ conversation }
+		conversations.update(_ :+ conversation)
 		callbacksProxy.conversationAdded(conversationId)
 		conversationId
 	}
 
 	private def expireConversations():Unit	=
 		conversations
-		.modify		(_  partition { _.alive() })
-		.map		{ _.id }
-		.foreach	(callbacksProxy.conversationRemoved)
+		.modify	(_.partition(_.alive()))
+		.map	(_.id)
+		.foreach(callbacksProxy.conversationRemoved)
 
 	private def publishConversations():Unit	=
-		conversations.get() foreach { _.maybePublish() }
+		conversations.get().foreach(_.maybePublish())
 
 	private def findConversation(id:ConversationId):Option[Conversation]	=
-		conversations.get() find { _.id ==== id }
+		conversations.get() find(_.id ==== id)
 
 	private def nextConversationId():ConversationId	=
 		ConversationId(Guid.unsafeFresh())

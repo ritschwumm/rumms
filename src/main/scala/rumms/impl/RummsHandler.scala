@@ -30,12 +30,12 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	//## request handling
 
 	lazy val totalPlan:HttpHandler	=
-		partialPlan	orAlways
+		partialPlan	`orAlways`
 		constant(HttpResponder.sync(EmptyStatus(NOT_FOUND)))
 
 	lazy val partialPlan:HttpPHandler	=
-		subHandler(GET,		paths.code,	code)	orElse
-		subHandler(POST,	paths.hi,	hi)		orElse
+		subHandler(GET,		paths.code,	code)	`orElse`
+		subHandler(POST,	paths.hi,	hi)		`orElse`
 		subHandler(POST,	paths.comm,	comm)
 
 	private def subHandler(method:HttpMethod, subPath:String, handler:HttpHandler):HttpPHandler	=
@@ -80,7 +80,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 		params.foldLeft(raw){ (raw, param) =>
 			val (key, value)	= param
 			val pattern			= "@{" + key + "}"
-			val code			= JsonCodec encodeShort value
+			val code			= JsonCodec.encodeShort(value)
 			raw.replace(pattern, code)
 		}
 
@@ -114,7 +114,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 			for {
 				json			<- handleException(	bodyString(request),						Forbidden,		"unreadable message")
 				data			<- handleDecode(	JsonCodec.decode(json),						Forbidden,		"invalid message")
-				conversationId	<- handleNone(		(data / "conversation").string,				Forbidden,		"conversationId missing")	map ConversationId.apply
+				conversationId	<- handleNone(		(data / "conversation").string,				Forbidden,		"conversationId missing").map(ConversationId.apply)
 				clientCont		<- handleNone(		(data / "clientCont").toLong,				Forbidden,		"clientCont missing")
 				serverCont		<- handleNone(		(data / "serverCont").toLong,				Forbidden,		"serverCont missing")
 				incoming		<- handleNone(		(data / "messages").arraySeq,				Forbidden,		"messages missing")
@@ -146,7 +146,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				}
 
 				// maybe there already are new messages, if not, we have to wait
-				val fromConversation	= conversation fetchOutgoing serverCont
+				val fromConversation	= conversation.fetchOutgoing(serverCont)
 				if (fromConversation.messages.nonEmpty || incoming.nonEmpty) {
 					HttpResponder.sync(compileResponse(fromConversation))
 				}
@@ -155,15 +155,17 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 						HttpResponder.async(
 							timeout	= Constants.continuationTTL,
 							timeoutResponse	= thunk {
-								compileResponse(conversation fetchOutgoing serverCont)
+								compileResponse(conversation.fetchOutgoing(serverCont))
 							},
 							errorResponse	= thunk {
 								EmptyStatus(INTERNAL_SERVER_ERROR)
 							}
 						)
-					conversation onHasOutgoing thunk {
-						send(compileResponse(conversation fetchOutgoing serverCont))
-					}
+					conversation.onHasOutgoing(
+						thunk {
+							send(compileResponse(conversation.fetchOutgoing(serverCont)))
+						}
+					)
 					responder
 				}
 			}
@@ -173,7 +175,9 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	}
 
 	private def bodyString(request:HttpRequest):Either[Exception,String]	=
-		Catch.exception in (request.body readString Constants.encoding)
+		Catch.exception.in {
+			request.body.readString(Constants.encoding)
+		}
 
 	//------------------------------------------------------------------------------
 	//## helper
@@ -211,7 +215,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 			),
 			HttpOutput.writeString(
 				Charsets.utf_8,
-				JsonCodec encodeShort json
+				JsonCodec.encodeShort(json)
 			)
 		)
 
