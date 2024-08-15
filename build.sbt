@@ -4,7 +4,7 @@ ThisBuild / versionScheme := Some("early-semver")
 
 name			:= "rumms"
 organization	:= "de.djini"
-version			:= "0.342.0"
+version			:= "0.343.0"
 
 scalaVersion	:= "3.4.0"
 scalacOptions	++= Seq(
@@ -18,12 +18,12 @@ scalacOptions	++= Seq(
 )
 
 libraryDependencies	++= Seq(
-	"de.djini"			%%	"scutil-jdk"			% "0.244.0"	% "compile",
-	"de.djini"			%%	"scutil-guid"			% "0.244.0"	% "compile",
-	"de.djini"			%%	"scjson-codec"			% "0.272.0"	% "compile",
-	"de.djini"			%%	"scjson-converter"		% "0.272.0"	% "compile",
-	"de.djini"			%%	"scwebapp-core"			% "0.304.0"	% "compile",
-	"de.djini"			%%	"scwebapp-servlet"		% "0.304.0"	% "compile",
+	"de.djini"			%%	"scutil-jdk"			% "0.245.0"	% "compile",
+	"de.djini"			%%	"scutil-guid"			% "0.245.0"	% "compile",
+	"de.djini"			%%	"scjson-codec"			% "0.273.0"	% "compile",
+	"de.djini"			%%	"scjson-converter"		% "0.273.0"	% "compile",
+	"de.djini"			%%	"scwebapp-core"			% "0.305.0"	% "compile",
+	"de.djini"			%%	"scwebapp-servlet"		% "0.305.0"	% "compile",
 	"jakarta.servlet"	%   "jakarta.servlet-api"	% "5.0.0"	% "provided"
 )
 
