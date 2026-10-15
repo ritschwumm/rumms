@@ -4,10 +4,11 @@ ThisBuild / versionScheme := Some("early-semver")
 
 name			:= "rumms"
 organization	:= "de.djini"
-version			:= "0.362.0"
+version			:= "0.363.0"
 
 scalaVersion	:= "3.7.3"
 scalacOptions	++= Seq(
+	"-preview",
 	"-feature",
 	"-deprecation",
 	"-unchecked",
@@ -22,12 +23,12 @@ scalacOptions	++= Seq(
 )
 
 libraryDependencies	++= Seq(
-	"de.djini"			%%	"scutil-jdk"			% "0.263.0"	% "compile",
-	"de.djini"			%%	"scutil-guid"			% "0.263.0"	% "compile",
-	"de.djini"			%%	"scjson-codec"			% "0.291.0"	% "compile",
-	"de.djini"			%%	"scjson-converter"		% "0.291.0"	% "compile",
-	"de.djini"			%%	"scwebapp-core"			% "0.324.0"	% "compile",
-	"de.djini"			%%	"scwebapp-servlet"		% "0.324.0"	% "compile",
+	"de.djini"			%%	"scutil-jdk"			% "0.264.0"	% "compile",
+	"de.djini"			%%	"scutil-guid"			% "0.264.0"	% "compile",
+	"de.djini"			%%	"scjson-codec"			% "0.292.0"	% "compile",
+	"de.djini"			%%	"scjson-converter"		% "0.292.0"	% "compile",
+	"de.djini"			%%	"scwebapp-core"			% "0.325.0"	% "compile",
+	"de.djini"			%%	"scwebapp-servlet"		% "0.325.0"	% "compile",
 	"jakarta.servlet"	%   "jakarta.servlet-api"	% "5.0.0"	% "provided"
 )
 
@@ -46,7 +47,6 @@ wartremoverErrors ++= Seq(
 	Wart.AnyVal,
 	//Wart.Nothing,
 	Wart.ArrayEquals,
-	Wart.ImplicitParameter,
 	Wart.LeakingSealed,
 	Wart.DefaultArguments,
 	Wart.Overloading,
