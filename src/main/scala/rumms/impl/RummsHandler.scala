@@ -240,16 +240,20 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 
 	private def handleDecode[T](result:Either[JsonDecodeFailure,T], responder:HttpResponder, text:String):Action[T]	=
 		Action(
-			result leftMap { e => (responder, Problem.Plain(show"${text}: expected ${e.expectation} at ${e.offset}")) }
+			result.leftMap(e =>
+				(responder, Problem.Plain(show"${text}: expected ${e.expectation} at ${e.offset}"))
+			)
 		)
 
 	private def handleException[T](result:Either[Exception,T], responder:HttpResponder, text:String):Action[T]	=
 		Action(
-			result leftMap { e => (responder, Problem.Exceptional(text, e)) }
+			result.leftMap(e =>
+				(responder, Problem.Exceptional(text, e))
+			)
 		)
 
 	private def handleNone[T](result:Option[T], responder:HttpResponder, text:String):Action[T]	=
 		Action(
-			result toRight ((responder, Problem.Plain(text)))
+			result.toRight((responder, Problem.Plain(text)))
 		)
 }

@@ -24,8 +24,8 @@ rumms.Conversation	= function(context) {
 
 	this.connected		= false;
 	this.queue			= null;
-	this.clientCont 	= null;
-	this.serverCont 	= null;
+	this.clientCont		= null;
+	this.serverCont		= null;
 
 	// non-null between push and call of commAbortFunc
 	this.commAbortTimer	= null;
@@ -98,9 +98,9 @@ rumms.Conversation.prototype = {
 	},
 
 	hiSuccess: function(text) {
-		this.queue			= [];
-		this.clientCont 	= 0;
-		this.serverCont 	= 0;
+		this.queue		= [];
+		this.clientCont	= 0;
+		this.serverCont	= 0;
 
 		function scan(s,p) {
 			return s.substring(0, p.length) === p
@@ -127,8 +127,8 @@ rumms.Conversation.prototype = {
 		this.conversationId = null;
 
 		this.queue			= null;
-		this.clientCont 	= null;
-		this.serverCont 	= null;
+		this.clientCont		= null;
+		this.serverCont		= null;
 	},
 
 	//------------------------------------------------------------------------------
