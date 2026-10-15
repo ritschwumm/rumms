@@ -210,7 +210,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 		HttpResponse(
 			OK,
 			DisableCaching ++
-			HeaderValues(
+			HeaderValue.many(
 				ContentType(application_json)
 			),
 			HttpOutput.writeString(
@@ -223,7 +223,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 		HttpResponse(
 			OK,
 			DisableCaching ++
-			HeaderValues(
+			HeaderValue.many(
 				ContentType(contentType.addParameter("charset",  Constants.encoding.name))
 			),
 			HttpOutput.writeString(Constants.encoding, text)

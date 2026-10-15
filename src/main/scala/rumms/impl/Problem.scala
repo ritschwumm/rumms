@@ -8,7 +8,7 @@ enum Problem {
 
 	def logValue:Seq[LogValue]	=
 		this match {
-			case Plain(message)						=> Seq(LogValue.string(message))
-			case Exceptional(message, exception)	=> Seq(LogValue.string(message), LogValue.throwable(exception))
+			case Plain(message)						=> Seq(LogValue.of(message))
+			case Exceptional(message, exception)	=> Seq(LogValue.of(message), LogValue.of(exception))
 		}
 }
