@@ -41,7 +41,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 	private def subHandler(method:HttpMethod, subPath:String, handler:HttpHandler):HttpPHandler	=
 		req => {
 			req.fullPath.utf8.exists(_ ==== configuration.path + subPath).option {
-				if (req.method.toOption == Some(method)) {
+				if req.method.toOption == Some(method) then {
 					try {
 						context.expireConversations()
 						handler(req)
@@ -147,7 +147,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 
 				// maybe there already are new messages, if not, we have to wait
 				val fromConversation	= conversation.fetchOutgoing(serverCont)
-				if (fromConversation.messages.nonEmpty || incoming.nonEmpty) {
+				if fromConversation.messages.nonEmpty || incoming.nonEmpty then {
 					HttpResponder.sync(compileResponse(fromConversation))
 				}
 				else {

@@ -30,7 +30,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 		// after an aborted request there may be messages in incoming already seen before
 		synchronized {
 			// TODO how can it happen that requests overtake each other?
-			if (clientCont < lastClientCont) {
+			if clientCont < lastClientCont then {
 				WARN(show"clientCont: ${lastClientCont}->${clientCont}")
 				return
 			}
