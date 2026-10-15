@@ -38,7 +38,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 			val count		= incoming.size
 			val relevant	= incoming.size `min` expected.toInt
 			lastClientCont	= clientCont
-			incoming drop (count-relevant)
+			incoming.drop(count-relevant)
 		}
 		.foreach { it =>
 			callbacks.messageReceived(id, it)
@@ -68,7 +68,7 @@ final class Conversation(val id:ConversationId, callbacks:RummsCallbacks) extend
 	def fetchOutgoing(serverCont:Long):Batch =
 		synchronized {
 			entries	= entries.filter { _.id >= serverCont }
-			val	messages	= entries.reverse map { _.message }
+			val	messages	= entries.reverse.map(_.message)
 			Batch(nextId, messages)
 		}
 

@@ -1,5 +1,7 @@
 package rumms
 
+import java.util.concurrent.atomic.AtomicReference
+
 import jakarta.servlet.ServletContext
 
 import scala.util.control.NonFatal
@@ -94,13 +96,13 @@ final class Rumms(configuration:RummsConfiguration) { outer =>
 	//------------------------------------------------------------------------------
 	//## callbacks
 
-	private val callbackses:Synchronized[Seq[RummsCallbacks]]	= Synchronized(Vector.empty)
+	private val callbackses:AtomicReference[Seq[RummsCallbacks]]	= new AtomicReference(Vector.empty)
 
 	private def addCallbacks(callbacks:RummsCallbacks):Unit	=
-		callbackses.update(_ :+ callbacks)
+		callbackses.updateAndGet(_ :+ callbacks)
 
 	private def removeCallbacks(callbacks:RummsCallbacks):Unit	=
-		callbackses.update(_.filter(_ != callbacks))
+		callbackses.updateAndGet(_.filter(_ != callbacks))
 
 	private val callbacksProxy:RummsCallbacks	=
 		new RummsCallbacks {
@@ -117,16 +119,15 @@ final class Rumms(configuration:RummsConfiguration) { outer =>
 				callbackses.get().foreach(_.messageReceived(conversationId, message))
 		}
 
-
 	//------------------------------------------------------------------------------
-	//## eonversations
+	//## conversations
 
-	private val conversations:Synchronized[Seq[Conversation]]	= Synchronized(Vector.empty)
+	private val conversations:AtomicReference[Seq[Conversation]]	= new AtomicReference(Vector.empty)
 
 	private def createConversation():ConversationId = {
 		val	conversationId	= nextConversationId()
 		val conversation	= new Conversation(conversationId, callbacksProxy)
-		conversations.update(_ :+ conversation)
+		conversations.updateAndGet(_ :+ conversation)
 		callbacksProxy.conversationAdded(conversationId)
 		conversationId
 	}

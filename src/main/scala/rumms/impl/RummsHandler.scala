@@ -102,7 +102,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				Connected(context.createConversation())
 			)
 
-		action.log foreach { ERROR(_*) }
+		action.log.foreach{ ERROR(_*) }
 		action.responder
 	}
 
@@ -153,7 +153,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				else {
 					val (responder, send)	=
 						HttpResponder.async(
-							timeout	= Constants.continuationTTL,
+							timeout			= Constants.continuationTTL,
 							timeoutResponse	= thunk {
 								compileResponse(conversation.fetchOutgoing(serverCont))
 							},
@@ -170,7 +170,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 				}
 			}
 
-		action.log foreach { ERROR(_*) }
+		action.log.foreach { ERROR(_*) }
 		action.responder
 	}
 
@@ -208,7 +208,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 
 	private def JsonOK(json:JsonValue):HttpResponse	=
 		HttpResponse(
-			OK,	None,
+			OK,
 			DisableCaching ++
 			HeaderValues(
 				ContentType(application_json)
@@ -221,7 +221,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 
 	private def StringOK(text:String, contentType:MimeType):HttpResponse	=
 		HttpResponse(
-			OK,	None,
+			OK,
 			DisableCaching ++
 			HeaderValues(
 				ContentType(contentType.addParameter("charset",  Constants.encoding.name))
@@ -231,7 +231,7 @@ final class RummsHandler(configuration:RummsConfiguration, context:RummsHandlerC
 
 	private def EmptyStatus(status:HttpStatus):HttpResponse	=
 		HttpResponse(
-			status,	None,
+			status,
 			DisableCaching,
 			HttpOutput.empty
 		)
